@@ -3,6 +3,22 @@
     "input_scale": 0.00391895417124033,
     "input_zero_point": -128
   },
+  "heads": {
+    "confidence": {
+      "tensor_index": 12,
+      "output_pos": 1,
+      "scale": 0.00390625,
+      "zero_point": -128,
+      "classes": 3
+    },
+    "teaching": {
+      "tensor_index": 14,
+      "output_pos": 0,
+      "scale": 0.00390625,
+      "zero_point": -128,
+      "classes": 3
+    }
+  },
   "vectors": [
     {
       "features_raw": {
@@ -17,7 +33,7 @@
         0.30000001192092896,
         0.20000000298023224
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 1,
       "expect_confidence": 2
     },
     {
@@ -49,7 +65,7 @@
         0.20000000298023224,
         0.15000000596046448
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 1,
       "expect_confidence": 2
     },
     {
@@ -81,7 +97,7 @@
         0.0,
         0.0
       ],
-      "expect_teaching": 0,
+      "expect_teaching": 2,
       "expect_confidence": 0
     },
     {
@@ -97,7 +113,7 @@
         0.20000000298023224,
         0.3499999940395355
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 1,
       "expect_confidence": 2
     },
     {
@@ -113,12 +129,12 @@
         0.10000000149011612,
         0.0
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 2,
       "expect_confidence": 1
     },
     {
       "features_raw": {
-        "response_time": 1054.6782478596886,
+        "response_time": 1054.6782478596888,
         "press_duration": 124.22900472472618,
         "retry_count": 0.0,
         "wrong_streak": 13.0
@@ -129,7 +145,7 @@
         0.0,
         0.6499999761581421
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 0,
       "expect_confidence": 1
     },
     {
@@ -145,7 +161,7 @@
         0.0,
         0.05000000074505806
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 0,
       "expect_confidence": 1
     },
     {
@@ -161,7 +177,7 @@
         0.0,
         0.44999998807907104
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 0,
       "expect_confidence": 1
     },
     {
@@ -177,7 +193,7 @@
         0.20000000298023224,
         0.3499999940395355
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 1,
       "expect_confidence": 2
     },
     {
@@ -193,7 +209,7 @@
         0.0,
         0.25
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 0,
       "expect_confidence": 2
     },
     {
@@ -225,7 +241,7 @@
         0.0,
         0.25
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 0,
       "expect_confidence": 1
     },
     {
@@ -246,7 +262,7 @@
     },
     {
       "features_raw": {
-        "response_time": 4143.550980278466,
+        "response_time": 4143.5509802784645,
         "press_duration": 240.74541586595052,
         "retry_count": 1.0,
         "wrong_streak": 6.0
@@ -289,7 +305,7 @@
         0.20000000298023224,
         0.3499999940395355
       ],
-      "expect_teaching": 2,
+      "expect_teaching": 1,
       "expect_confidence": 2
     },
     {
@@ -305,7 +321,7 @@
         0.0,
         0.0
       ],
-      "expect_teaching": 0,
+      "expect_teaching": 2,
       "expect_confidence": 0
     },
     {
@@ -321,7 +337,7 @@
         0.10000000149011612,
         0.0
       ],
-      "expect_teaching": 1,
+      "expect_teaching": 2,
       "expect_confidence": 1
     }
   ]

@@ -19,3 +19,6 @@ package-lock.json
 .pptx_work/
 docs/*.pdf
 docs/slide-*.jpg
+
+# PlatformIO build output
+.pio/

@@ -30,6 +30,7 @@
 
 // --- TFLite Micro ----------------------------------------------------------
 #include <TensorFlowLite_ESP32.h>
+#include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
@@ -39,8 +40,8 @@ namespace {
 const tflite::Model *g_model = nullptr;
 tflite::MicroInterpreter *g_interpreter = nullptr;
 TfLiteTensor *g_input = nullptr;
-TfLiteTensor *g_out_conf = nullptr;    // 3 classes
-TfLiteTensor *g_out_teach = nullptr;   // 6 classes
+TfLiteTensor *g_out_conf = nullptr;    // MODEL_CONF_CLASSES
+TfLiteTensor *g_out_teach = nullptr;   // MODEL_TEACH_CLASSES
 alignas(16) uint8_t g_arena[MODEL_ARENA_SIZE];
 }  // namespace
 
@@ -74,7 +75,11 @@ static bool model_begin() {
   resolver.AddQuantize();
   resolver.AddDequantize();
 
-  static tflite::MicroInterpreter interpreter(g_model, resolver, g_arena, sizeof(g_arena));
+  // TensorFlowLite_ESP32 1.0.0 predates the TFLM release that dropped the
+  // ErrorReporter argument, so it is required here.
+  static tflite::MicroErrorReporter micro_error_reporter;
+  static tflite::MicroInterpreter interpreter(g_model, resolver, g_arena, sizeof(g_arena),
+                                              &micro_error_reporter);
   g_interpreter = &interpreter;
   if (g_interpreter->AllocateTensors() != kTfLiteOk) {
     Serial.println("AllocateTensors failed -- raise MODEL_ARENA_SIZE");
@@ -82,16 +87,21 @@ static bool model_begin() {
   }
 
   g_input = g_interpreter->input(0);
-  // Match outputs by class count rather than index: the converter does not
-  // promise to preserve the order the Keras model declared them in.
-  for (size_t i = 0; i < g_interpreter->outputs_size(); i++) {
-    TfLiteTensor *t = g_interpreter->output(i);
-    int n = t->dims->data[t->dims->size - 1];
-    if (n == MODEL_CONF_CLASSES) g_out_conf = t;
-    else if (n == MODEL_TEACH_CLASSES) g_out_teach = t;
+  // The converter does not preserve the order the Keras model declared its
+  // outputs in, and both heads are the same width, so neither position nor
+  // class count is safe to assume here. tools/tflite_to_header.py resolves the
+  // mapping from the flatbuffer's signature and bakes it into model_data.h.
+  if ((int)g_interpreter->outputs_size() <= MODEL_CONF_OUTPUT_INDEX ||
+      (int)g_interpreter->outputs_size() <= MODEL_TEACH_OUTPUT_INDEX) {
+    Serial.println("model output count disagrees with model_data.h");
+    return false;
   }
-  if (!g_input || !g_out_conf || !g_out_teach) {
-    Serial.println("could not match model outputs to heads");
+  g_out_conf = g_interpreter->output(MODEL_CONF_OUTPUT_INDEX);
+  g_out_teach = g_interpreter->output(MODEL_TEACH_OUTPUT_INDEX);
+  if (!g_input || !g_out_conf || !g_out_teach ||
+      g_out_conf->dims->data[g_out_conf->dims->size - 1] != MODEL_CONF_CLASSES ||
+      g_out_teach->dims->data[g_out_teach->dims->size - 1] != MODEL_TEACH_CLASSES) {
+    Serial.println("model outputs do not match model_data.h -- stale header");
     return false;
   }
 

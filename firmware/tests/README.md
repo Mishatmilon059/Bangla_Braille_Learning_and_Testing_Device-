@@ -29,13 +29,31 @@ several motors fire together, this is why.
 
 Never drive motors from the ESP32's 3V3 pin. Common ground everywhere.
 
-## Copying the headers
+## Generating the headers
 
-Sketches 6 and the main firmware need the generated headers. From the repo root:
+Sketch 6 and the main firmware need the generated headers. From the repo root:
 
 ```bash
 python3 tools/gen_engine.py
 python3 tools/gen_braille_header.py
 python3 tools/train.py && python3 tools/tflite_to_header.py
-cp firmware/braille_tutor/{rule_engine.h,braille_map.h,model_data.h} firmware/tests/t6_model/
 ```
+
+They are not copied into `t6_model/`. Its `platformio.ini` adds
+`firmware/braille_tutor/` to the include path instead, so the sketch always
+tests the exact headers the main firmware compiles — a copy is how this test
+ends up passing against a model the firmware no longer runs.
+
+## Why t6 can fail even when the model is fine
+
+TFLite Micro's `FULLY_CONNECTED` kernel takes **one** requantization multiplier
+from `filter->params.scale` and applies it to every output channel. TFLite's
+converter defaults to **per-channel** weights — one scale per output unit.
+Nothing rejects that combination: TFLM loads the model, runs it, and quietly
+uses channel 0's scale for all channels. The softmax still sums to 1.0 and the
+output still looks like a probability distribution; it is just the wrong one.
+
+`tools/train.py` therefore disables per-channel quantization for the Dense
+layers, and asserts after conversion that no weight tensor carries more than one
+scale. If you ever see t6 report plausible-but-wrong classes while the desktop
+model is correct, check that first.

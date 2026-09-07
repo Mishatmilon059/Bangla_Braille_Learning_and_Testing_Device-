@@ -17,8 +17,8 @@
     "total": 0,
     "real": 0
   },
-  "tflite_bytes": 5480,
-  "tflite_vs_keras_teaching": 0.2967032967032967,
+  "tflite_bytes": 4280,
+  "tflite_vs_keras_teaching": 1.0,
   "spec_version": 2,
   "trained_on_real_data": false
 }

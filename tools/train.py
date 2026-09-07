@@ -41,6 +41,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import rule_engine_gen as engine  # noqa: E402
+import tflite_heads  # noqa: E402
 
 N_TA = len(engine.TEACHING_ACTION_NAMES)
 N_CS = len(engine.CONFIDENCE_STATE_NAMES)
@@ -301,6 +302,33 @@ def main():
     conv.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     conv.inference_input_type = tf.int8
     conv.inference_output_type = tf.int8
+
+    # Per-tensor weights for the Dense layers, not per-channel.
+    #
+    # This is not a tuning choice, it is a hard requirement of the target.
+    # TFLite Micro's FULLY_CONNECTED kernel derives ONE requantization
+    # multiplier from filter->params.scale (see CalculateOpDataFullyConnected)
+    # and applies it to every output channel. The converter's default is
+    # per-channel weights, one scale per output unit. Nothing rejects that
+    # model: TFLM loads it, runs it, and silently applies channel 0's scale to
+    # all channels, so every other channel's logits come out wrong by a
+    # constant factor. On the board that showed up as a softmax that still
+    # summed to 1.0 and still looked plausible, with a different argmax.
+    #
+    # Verified by simulating both paths against the same input: the per-tensor
+    # path reproduces the ESP32's int8 output exactly, the per-channel path
+    # reproduces the desktop's. Do not remove this without re-running t6_model.
+    disable_pc = "_experimental_disable_per_channel_quantization_for_dense_layers"
+    if hasattr(conv, disable_pc):
+        setattr(conv, disable_pc, True)
+    elif hasattr(conv, "_experimental_disable_per_channel"):
+        # Older TF: blunter switch, turns per-channel off for every op.
+        conv._experimental_disable_per_channel = True
+    else:
+        sys.exit("this TensorFlow exposes no way to disable per-channel weight "
+                 "quantization; the exported model will not run correctly on "
+                 "TFLite Micro. See the comment above.")
+
     tflite_model = conv.convert()
 
     tfl_path = args.out / "model.tflite"
@@ -310,6 +338,19 @@ def main():
     # --- verify the quantized model still agrees with the float one --------
     interp = tf.lite.Interpreter(model_content=tflite_model)
     interp.allocate_tensors()
+
+    # Assert the flag above actually took effect. A weight tensor carrying more
+    # than one scale is per-channel, which TFLM will run wrongly and silently.
+    multi = [(d["name"], len(d["quantization_parameters"]["scales"]))
+             for d in interp.get_tensor_details()
+             if d["name"].endswith("MatMul") and
+             len(d["quantization_parameters"]["scales"]) > 1]
+    if multi:
+        for name, n in multi:
+            print(f"  {name}: {n} scales")
+        sys.exit("weights are still per-channel -- TFLite Micro would compute "
+                 "the wrong logits on the ESP32. See the converter comment above.")
+
     in_det = interp.get_input_details()[0]
     out_dets = interp.get_output_details()
     in_scale, in_zp = in_det["quantization"]
@@ -322,12 +363,20 @@ def main():
         for d in out_dets:
             q_preds[d["index"]].append(int(np.argmax(interp.get_tensor(d["index"])[0])))
 
-    # match each tflite output to a head by size
-    by_size = {}
-    for d in out_dets:
-        by_size[int(d["shape"][-1])] = np.array(q_preds[d["index"]])
-    tfl_cs = by_size.get(N_CS)
-    tfl_ta = by_size.get(N_TA)
+    # Match each tflite output to a head via the signature, NOT by class count:
+    # both heads are the same width, so a size test matches one output twice.
+    heads = tflite_heads.resolve_heads(interp, N_CS, N_TA)
+    tfl_cs = np.array(q_preds[heads["confidence"]["tensor_index"]])
+    tfl_ta = np.array(q_preds[heads["teaching"]["tensor_index"]])
+
+    # Cross-check the signature against the evidence: each tflite head should
+    # track its own Keras head far better than the other one. If the mapping
+    # ever silently flips, this catches it here instead of on the device.
+    if (np.mean(tfl_ta == pred_ta) < np.mean(tfl_cs == pred_ta) and
+            np.mean(tfl_cs == pred_cs) < np.mean(tfl_ta == pred_cs)):
+        sys.exit("head resolution is backwards: the tflite output named as the "
+                 "teaching head tracks the Keras confidence head. Check "
+                 "tools/tflite_heads.py against the converter's signature.")
 
     print(f"tflite vs keras : teaching {np.mean(tfl_ta == pred_ta):.4f} agreement, "
           f"confidence {np.mean(tfl_cs == pred_cs):.4f}")
@@ -348,9 +397,13 @@ def main():
             "expect_teaching": int(tfl_ta[k]),
             "expect_confidence": int(tfl_cs[k]),
         })
+    # `heads` is recorded so the header generator and the firmware use the same
+    # output-to-head mapping this script just validated, rather than each
+    # re-deriving it and possibly disagreeing.
     (args.out / "golden_vectors.json").write_text(
         json.dumps({"quantization": {"input_scale": float(in_scale),
                                      "input_zero_point": int(in_zp)},
+                    "heads": heads,
                     "vectors": golden}, indent=2), encoding="utf-8")
 
     model.save(args.out / "model.keras")
