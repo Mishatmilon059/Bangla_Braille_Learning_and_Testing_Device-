@@ -44,6 +44,33 @@ const int PIN_MOTOR[6]    = {13, 14, 26, 27, 32, 33};
 
 HardwareSerial mySoftwareSerial(2);
 DFRobotDFPlayerMini dfPlayer;
+bool g_df_ok = false;
+
+// Spoken prompt tracks on the SD card. Numbering comes from SYSTEM_PROMPTS in
+// tools/gen_audio.py; letters occupy 1..50 and the prompts start at 51.
+#define TRK_CORRECT        51   // সঠিক
+#define TRK_WRONG          52   // ভুল
+#define TRK_TRY_AGAIN      53   // আবার চেষ্টা করুন
+#define TRK_HINT           54   // ইঙ্গিত
+#define TRK_WELL_DONE      55   // খুব ভালো
+#define TRK_SESSION_START  59   // শুরু করা যাক
+#define TRK_SESSION_END    60   // অনুশীলন শেষ
+
+// dfPlayer.play() returns the moment the command is sent, not when the audio
+// ends. Two consequences, and the second one is the one that bites: back-to-back
+// prompts cut each other off, and response_time would include however long the
+// prompt took to speak -- which on a ~1.5 s clip is enough on its own to push
+// every attempt past the 6000 ms GUESSING threshold.
+static void audioPlayBlocking(uint16_t track, uint32_t timeout_ms = 4000) {
+  if (!g_df_ok) { delay(250); return; }
+  dfPlayer.play(track);
+  uint32_t t0 = millis();
+  delay(120);
+  while (millis() - t0 < timeout_ms) {
+    if (dfPlayer.available() && dfPlayer.readType() == DFPlayerPlayFinished) return;
+    delay(15);
+  }
+}
 
 // ============================================================
 //  CORRECTED BANGLADESH BRAILLE PATTERNS
@@ -288,6 +315,7 @@ void setup() {
     Serial.println("FAILED - check wiring!");
   } else {
     Serial.println("OK");
+    g_df_ok = true;
     dfPlayer.volume(30);
   }
 
@@ -329,6 +357,7 @@ void loop() {
         testCorrect = 0;
         testWrong   = 0;
         Serial.println("\n>> TEST MODE selected.");
+        audioPlayBlocking(TRK_SESSION_START);   // শুরু করা যাক
         showTestPrompt();
       } else if (c == 'P' || c == 'p') {
         printPerformanceReport();
@@ -360,6 +389,7 @@ void loop() {
         waitingForButtonInput = false;
         testTargetIndex       = -1;
         Serial.printf("\n-- Session ended. Correct: %d | Wrong: %d --\n", testCorrect, testWrong);
+        audioPlayBlocking(TRK_SESSION_END);   // অনুশীলন শেষ
         printPerformanceReport();
         showMenu();
       } else if (input == "P" || input == "p") {
@@ -427,6 +457,7 @@ void loop() {
       testTargetIndex       = -1;
       resetChord();
       Serial.printf("\n-- Session ended. Correct: %d | Wrong: %d --\n", testCorrect, testWrong);
+      audioPlayBlocking(TRK_SESSION_END);   // অনুশীলন শেষ
       printPerformanceReport();
       showMenu();
     }
@@ -468,8 +499,7 @@ void runLearn(int index) {
   Serial.print("  Braille dots: ");
   printDotPattern(BRAILLE_PATTERN[index]);
   Serial.println("----------------------------------------");
-  dfPlayer.play(index + 1);
-  delay(1500);
+  audioPlayBlocking(index + 1);
   if (index == 6 || index == 46) {
     Serial.println("  (2-cell character)");
     Serial.println("  Vibrating prefix cell (Dot6)...");
@@ -501,11 +531,10 @@ void runTestQuestion(int index) {
   Serial.printf("  QUESTION: Braille pattern for [%d] %s ?\n", index + 1, LETTER_NAMES[index]);
   Serial.println("  Listen to speaker, then press dots + SUBMIT.");
   Serial.println("========================================");
-  dfPlayer.play(index + 1);
-
-  // response_time runs from the end of the prompt to the SUBMIT press, the
-  // same span train.py measured. Started after play() so the audio call is
-  // not counted as the learner thinking.
+  // Blocking, then start the clock: response_time runs from the END of the
+  // prompt to the SUBMIT press, the same span train.py measured. Timing from
+  // the start of playback would charge the learner for the audio.
+  audioPlayBlocking(index + 1);
   promptEndMs = millis();
 }
 
@@ -557,6 +586,10 @@ void checkTestAnswer(byte typedPattern) {
   uint8_t taRule = (uint8_t)evaluate_teaching_action(&f);
   uint8_t csRule = (uint8_t)evaluate_confidence(&f);
 
+  // Whoever decided is who the learner hears. With the model live this is the
+  // point of the whole build: the network picks what comes out of the speaker.
+  uint8_t action = taRule;
+
   Serial.println("\n----------------------------------------");
   Serial.printf("  Character : %s\n", LETTER_NAMES[index]);
   Serial.print("  Your dots : "); printDotPattern(typedPattern);
@@ -578,6 +611,7 @@ void checkTestAnswer(byte typedPattern) {
     model_infer(norm, &taModel, &csModel);
     inferTotalUs += (micros() - t0);
 
+    action = taModel;
     bool taOk = (taModel == taRule);
     bool csOk = (csModel == csRule);
     nAttempts++;
@@ -601,6 +635,29 @@ void checkTestAnswer(byte typedPattern) {
     Serial.printf("  confidence %s\n", CONFIDENCE_STATE_NAMES[csRule]);
   }
   Serial.println("----------------------------------------");
+
+  // --- speak the result, then act on the decision -------------------------
+  Serial.printf("  audio: %s\n", correct ? "51 sothik" : "52 vul");
+  audioPlayBlocking(correct ? TRK_CORRECT : TRK_WRONG);
+
+  switch (action) {
+    case TA_REPEAT:
+      Serial.println("  audio: 53 abar chesta korun");
+      audioPlayBlocking(TRK_TRY_AGAIN);
+      break;
+    case TA_HINT:
+      // The word "hint" alone is not a hint. Buzzing the right pattern is.
+      Serial.println("  audio: 54 ingit  + vibrate the correct pattern");
+      audioPlayBlocking(TRK_HINT);
+      vibrateBrailleDotsSequential(correctPattern);
+      break;
+    case TA_NORMAL_PRACTICE:
+      if (correct) {
+        Serial.println("  audio: 55 khub bhalo");
+        audioPlayBlocking(TRK_WELL_DONE);
+      }
+      break;
+  }
 
   attemptsOnChar++;
   if (correct) { currentDrillChar = -1; attemptsOnChar = 0; }
