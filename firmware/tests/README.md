@@ -12,11 +12,17 @@ to see, so you know whether it passed without guessing.
 | 1 | `t1_blink_serial` | Board alive, serial at 115200 | Wrong board selected, bad USB cable (many are charge-only) |
 | 2 | `t2_buttons` | All 6 buttons, debounce, press timing | Button on a pin with no internal pull-up |
 | 3 | `t3_motors` | ULN2803A drives each motor | COM pin not tied to +5V — motors weak or GPIO dies |
+| 3b | `t3b_braille_patterns` | A typed letter buzzes the right dots | Motor channel swapped — dot 3 fires where dot 4 should |
 | 4 | `t4_dfplayer` | Audio plays by track number | Files not in `/mp3`, or not named `0001.mp3` |
 | 5 | `t5_sd` | Card mounts, CSV appends | 3.3V-only module fed 5V, or CS on the wrong pin |
 | 6 | `t6_model` | TFLite Micro matches `train.py` | Arena too small, or stale `model_data.h` |
 
-Only after all six pass should you flash `braille_tutor.ino`.
+Only after all six pass should you flash `braille_tutor.ino`. `t3b` is optional
+for bring-up but is the one place you can check a Braille cell by touch before
+the whole tutor is running: type a letter number (1–50) or its name into the
+Serial Monitor and the motors buzz its dots in reading order — 1 2 3 down the
+left column, then 4 5 6 down the right. It prints the cell as ASCII at the same
+time, so you can see what you should be feeling.
 
 ## Power, before you start
 
@@ -31,11 +37,17 @@ Never drive motors from the ESP32's 3V3 pin. Common ground everywhere.
 
 ## Copying the headers
 
-Sketches 6 and the main firmware need the generated headers. From the repo root:
+Sketches 3b and 6 and the main firmware need the generated headers, and each
+Arduino sketch folder needs its own copy. From the repo root:
 
 ```bash
 python3 tools/gen_engine.py
 python3 tools/gen_braille_header.py
 python3 tools/train.py && python3 tools/tflite_to_header.py
 cp firmware/braille_tutor/{rule_engine.h,braille_map.h,model_data.h} firmware/tests/t6_model/
+cp firmware/braille_tutor/braille_map.h firmware/tests/t3b_braille_patterns/
 ```
+
+Re-run the copy after every `gen_braille_header.py` — the copies are snapshots,
+and a stale one means `t3b` buzzes a pattern the rest of the system no longer
+believes in.

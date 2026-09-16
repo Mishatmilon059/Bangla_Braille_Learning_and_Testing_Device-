@@ -9,6 +9,11 @@ node_modules/
 web/config.local.js
 .env
 
+# ESP32 WiFi credentials — never commit real credentials
+firmware/tests/t7_cloud_dot/secrets.h
+firmware/tests/t8_cloud_quiz/secrets.h
+firmware/tests/t9_dfplayer_test/secrets.h
+
 
 # training intermediates
 dataset/*.csv

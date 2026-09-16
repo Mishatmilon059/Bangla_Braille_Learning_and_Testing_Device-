@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFPlayer Track Test</title>
+<style>
+  :root { --bg:#111; --panel:#1b1b1b; --ink:#eee; --muted:#888; --accent:#3ddc84; --err:#ff5a5a; --line:#2c2c2c; }
+  * { box-sizing:border-box; }
+  body {
+    background:var(--bg); color:var(--ink); margin:0; padding:24px 16px 48px;
+    font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:18px;
+  }
+  h1 { font-size:20px; font-weight:600; margin:0; }
+  .sub { color:var(--muted); font-size:13px; margin-top:-8px; text-align:center; max-width:44ch; }
+
+  .device-row { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); }
+  .device-row input {
+    background:var(--panel); border:1px solid var(--line); color:var(--ink);
+    padding:6px 8px; border-radius:6px; font-size:13px; width:120px;
+  }
+
+  .grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(52px, 1fr));
+    gap:7px; width:100%; max-width:640px;
+  }
+  button.track {
+    aspect-ratio:1; border-radius:8px; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink); font-size:15px; font-weight:600;
+    cursor:pointer; font-variant-numeric:tabular-nums;
+    transition:transform .08s ease, background .15s ease;
+  }
+  button.track:active { transform:scale(0.92); background:var(--accent); color:#08210f; }
+  button.track:disabled { opacity:.5; cursor:default; }
+
+  .log {
+    width:100%; max-width:640px; border:1px solid var(--line); border-radius:10px;
+    background:var(--panel); padding:10px 12px; display:flex; flex-direction:column;
+    gap:6px; max-height:220px; overflow-y:auto; font-size:12.5px; font-family:ui-monospace,monospace;
+  }
+  .log .entry { display:flex; justify-content:space-between; gap:10px; }
+  .log .ok { color:var(--accent); }
+  .log .fail { color:var(--err); }
+  .log .empty { color:var(--muted); text-align:center; padding:8px 0; }
+</style>
+</head>
+<body>
+
+  <h1>DFPlayer Track Test</h1>
+  <p class="sub">Tap a number to play that track (0001.mp3 .. 0050.mp3) on the ESP32's DFPlayer, over Supabase.</p>
+
+  <div class="device-row">
+    device_id
+    <input id="deviceId" value="esp32_01">
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="log" id="log">
+    <div class="empty">nothing sent yet</div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://rufaacgatrebsyxnyfbq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_lI3qv5Xk44GAhzL4R7I2GA_4k1aUar-";
+
+  const grid = document.getElementById('grid');
+  const log = document.getElementById('log');
+  const deviceIdInput = document.getElementById('deviceId');
+
+  function addLog(text, ok) {
+    if (log.querySelector('.empty')) log.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'entry';
+    const time = new Date().toLocaleTimeString();
+    row.innerHTML = `<span class="${ok ? 'ok' : 'fail'}">${text}</span><span>${time}</span>`;
+    log.prepend(row);
+  }
+
+  // The ESP32 sketch reads "letter_id" and plays track = letter_id + 1, so a
+  // track typed here as "5" is sent as letter_id 4 -- same remote_commands
+  // table and column t7/t8 use, no separate schema needed for this test.
+  async function sendTrack(n, btn) {
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/remote_commands`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          device_id: deviceIdInput.value.trim() || 'esp32_01',
+          letter_id: n - 1,
+        }),
+      });
+      if (res.ok) {
+        addLog(`sent track ${n}`, true);
+      } else {
+        const body = await res.text();
+        addLog(`track ${n} failed: ${res.status}`, false);
+        console.error('insert failed', res.status, body);
+      }
+    } catch (err) {
+      addLog(`track ${n} failed: offline?`, false);
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  for (let n = 1; n <= 50; n++) {
+    const btn = document.createElement('button');
+    btn.className = 'track';
+    btn.textContent = n;
+    btn.addEventListener('click', () => sendTrack(n, btn));
+    grid.appendChild(btn);
+  }
+</script>
+</body>
+</html>

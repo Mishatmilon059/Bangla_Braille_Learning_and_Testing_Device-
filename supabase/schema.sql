@@ -154,6 +154,40 @@ where not is_synthetic
 group by char_id
 order by accuracy asc;
 
+-- ---------------------------------------------------------------------------
+-- Remote dot control -- lets a phone app buzz a single motor over the cloud.
+-- ---------------------------------------------------------------------------
+-- A row here is a command, not a data point: "device_id, buzz dot N" or
+-- "device_id, play letter N (its full dot sequence)." The ESP32 polls for
+-- rows with id greater than the last one it handled and remembers that id in
+-- RAM, so there is no update/delete policy needed -- append-only, same
+-- pattern as `attempts`. Exactly one of `dot` / `letter_id` is set per row.
+
+create table if not exists remote_commands (
+  id          bigserial primary key,
+  created_at  timestamptz not null default now(),
+  device_id   text        not null,   -- which ESP32 this targets, e.g. 'esp32_01'
+  dot         smallint,               -- 1..6, buzz this single Braille dot
+  letter_id   smallint,               -- 0..49, play this letter's full pattern
+
+  constraint remote_commands_dot_range    check (dot is null or dot between 1 and 6),
+  constraint remote_commands_letter_range check (letter_id is null or letter_id between 0 and 49),
+  constraint remote_commands_one_target   check (dot is not null or letter_id is not null)
+);
+
+create index if not exists remote_commands_device_idx on remote_commands (device_id, id);
+
+alter table remote_commands enable row level security;
+
+drop policy if exists remote_commands_anon_insert on remote_commands;
+create policy remote_commands_anon_insert on remote_commands
+  for insert to anon with check (true);
+
+drop policy if exists remote_commands_anon_select on remote_commands;
+create policy remote_commands_anon_select on remote_commands
+  for select to anon using (true);
+
+
 -- Overall collection dashboard.
 create or replace view collection_summary as
 select count(*)                                       as total_rows,
