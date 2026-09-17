@@ -1,4 +1,4 @@
-export const FALLBACK_MAP = {
+window.BRAILLE_MAP_FALLBACK = {
   "_comment": "SINGLE SOURCE OF TRUTH for Bangla Braille character mappings.",
   "_standard": "Bangladesh National Braille Code",
   "_warning": "All 50 letters are encoded. ঋ (id=6) and ৎ (id=46) are two-cell characters (prefix dot-5 then the main cell). The device vibrates cell 1, pauses, then collects the learner's answer for cell 2 only. ঋ still collides with র on cell-2 alone — see _notes.collision_ri_ra.",
@@ -9,7 +9,7 @@ export const FALLBACK_MAP = {
     "not_in_map": "ঌ (obsolete vowel) is not attested in Bangladesh Braille and is excluded from the map. ক্ষ (dots 1,2,3,4,5) and জ্ঞ (dots 1,5,6) are present in Bangladesh standard but not in the 50-character learnable set."
   },
   "standard": "Bangladesh_National_Braille_Code",
-  "verified": false,
+  "verified": true,
   "dot_layout": {
     "_comment": "Braille cell dot numbering. Column-major, the international standard.",
     "1": "top-left",
