@@ -43,17 +43,25 @@ export const FEATURE_INDEX = {
   response_time: 0,
   press_duration: 1,
   retry_count: 2,
-  wrong_streak: 3,
+  prev_accuracy: 3,
+  prev_mastery: 4,
+  hint_count: 5,
+  current_streak: 6,
+  wrong_streak: 7,
 };
 
 export const FEATURE_RANGES = [
   { name: 'response_time', min: 0.0, max: 15000.0 },
   { name: 'press_duration', min: 0.0, max: 2000.0 },
   { name: 'retry_count', min: 0.0, max: 10.0 },
+  { name: 'prev_accuracy', min: 0.0, max: 1.0 },
+  { name: 'prev_mastery', min: 0.0, max: 1.0 },
+  { name: 'hint_count', min: 0.0, max: 10.0 },
+  { name: 'current_streak', min: 0.0, max: 20.0 },
   { name: 'wrong_streak', min: 0.0, max: 20.0 },
 ];
 
-export const FEATURE_COUNT = 4;
+export const FEATURE_COUNT = 8;
 
 /**
  * Fixed min-max scaling with clamping. Ranges come from the spec, NOT from the

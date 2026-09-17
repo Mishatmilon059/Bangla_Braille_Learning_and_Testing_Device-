@@ -49,14 +49,14 @@ ALL_FEATURE_RANGES = [
 # (index, name, min, max) in canonical MODEL INPUT order -- only features with
 # model_input=true in the spec.
 FEATURE_RANGES = [
-    (0, 'response_time',   0.0,  15000.0),
-    (1, 'press_duration',  0.0,   2000.0),
-    (2, 'retry_count',     0.0,     10.0),
-    (3, 'prev_accuracy',   0.0,      1.0),
-    (4, 'prev_mastery',    0.0,      1.0),
-    (5, 'hint_count',      0.0,     10.0),
-    (6, 'current_streak',  0.0,     20.0),
-    (7, 'wrong_streak',    0.0,     20.0),
+    (0, 'response_time', 0.0, 15000.0),
+    (1, 'press_duration', 0.0, 2000.0),
+    (2, 'retry_count', 0.0, 10.0),
+    (3, 'prev_accuracy', 0.0, 1.0),
+    (4, 'prev_mastery', 0.0, 1.0),
+    (5, 'hint_count', 0.0, 10.0),
+    (6, 'current_streak', 0.0, 20.0),
+    (7, 'wrong_streak', 0.0, 20.0),
 ]
 FEATURE_NAMES = [r[1] for r in FEATURE_RANGES]
 FEATURE_COUNT = 8

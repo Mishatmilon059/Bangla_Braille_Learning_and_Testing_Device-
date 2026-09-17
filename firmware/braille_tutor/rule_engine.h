@@ -5,7 +5,7 @@
 
 #define SPEC_VERSION 2
 #define ALL_FEATURE_COUNT 14
-#define FEATURE_COUNT 4
+#define FEATURE_COUNT 8
 
 typedef enum {
   TA_REPEAT = 0,
@@ -55,14 +55,18 @@ __attribute__((unused)) static const double ALL_FEATURE_MAX[ALL_FEATURE_COUNT] =
 
 // Model input only (model_input=true in the spec). Must match FEATURE_INDEX
 // in web/rule_engine.js.
-static const double FEATURE_MIN[FEATURE_COUNT] = { 0.0, 0.0, 0.0, 0.0 };
-static const double FEATURE_MAX[FEATURE_COUNT] = { 15000.0, 2000.0, 10.0, 20.0 };
+static const double FEATURE_MIN[FEATURE_COUNT] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+static const double FEATURE_MAX[FEATURE_COUNT] = { 15000.0, 2000.0, 10.0, 1.0, 1.0, 10.0, 20.0, 20.0 };
 
 static inline void features_to_vector(const Features *f, double *v) {
   v[0] = f->response_time;
   v[1] = f->press_duration;
   v[2] = f->retry_count;
-  v[3] = f->wrong_streak;
+  v[3] = f->prev_accuracy;
+  v[4] = f->prev_mastery;
+  v[5] = f->hint_count;
+  v[6] = f->current_streak;
+  v[7] = f->wrong_streak;
 }
 
 // Fixed min-max scaling with clamping. Ranges are from the spec, not the
