@@ -27,7 +27,25 @@ export class BrailleCell {
 
   clear() {
     for (const el of this.els.values()) {
-      el.classList.remove('on', 'correct', 'wrong', 'pulse');
+      el.classList.remove('on', 'correct', 'wrong', 'pulse', 'hint');
+    }
+  }
+
+  showHint(dots) {
+    for (const d of DOTS) {
+      const el = this.els.get(d);
+      if (!el) continue;
+      if (dots.includes(d)) {
+        el.classList.add('hint');
+      } else {
+        el.classList.remove('hint');
+      }
+    }
+  }
+
+  clearHint() {
+    for (const el of this.els.values()) {
+      el.classList.remove('hint');
     }
   }
 
@@ -137,6 +155,20 @@ export class KeyPad {
     this.pressOrder = [];
     this.firstPressMs = null;
     if (this.keyEls) for (const el of this.keyEls.values()) el.classList.remove('active');
+  }
+
+  showHint(dots) {
+    if (!this.keyEls) return;
+    for (const [d, el] of this.keyEls.entries()) {
+      el.classList.toggle('hint', dots.includes(d));
+    }
+  }
+
+  clearHint() {
+    if (!this.keyEls) return;
+    for (const el of this.keyEls.values()) {
+      el.classList.remove('hint');
+    }
   }
 
   press(dot) {

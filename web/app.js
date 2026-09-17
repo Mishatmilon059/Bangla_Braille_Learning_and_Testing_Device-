@@ -293,6 +293,7 @@ function nextPrompt(prevAction = null, prevLetter = null) {
 
   state.cell.clear();
   state.pad.reset();
+  if (state.pad.clearHint) state.pad.clearHint();
   ui.hintBox.classList.remove('show');
   ui.feedback.classList.remove('show');
   ui.promptChar.textContent = displayChar(letter.char);
@@ -306,19 +307,34 @@ function nextPrompt(prevAction = null, prevLetter = null) {
 function clearEntry() {
   state.pad.reset();
   state.cell.clear();
+  if (state.current && state.current.hints > 0) {
+    const dots = state.current.letter.dots || [];
+    state.cell.showHint(dots);
+    if (state.pad.showHint) state.pad.showHint(dots);
+  }
 }
 
 function useHint() {
   if (!state.running || !state.current) return;
   state.current.hints += 1;
   const letter = state.current.letter;
-  const dots = letter.dots;
+  const dots = letter.dots || [];
+
+  // Visually illuminate the correct Braille dots on the 6-dot cell and the keypad
+  state.cell.showHint(dots);
+  if (state.pad && state.pad.showHint) {
+    state.pad.showHint(dots);
+  }
+
   if (letter.cells && letter.cells.length === 2) {
     const [pre, main] = letter.cells;
-    ui.hintBox.textContent =
-      `Hint: 2-cell — prefix dot ${pre.join(',')} (device vibrates first), then enter dots ${main.join(', ')}`;
+    ui.hintBox.innerHTML =
+      `<b>💡 ইঙ্গিত (Hint):</b> ২-সেল ব্রেইল — প্রথমে প্রিফিক্স ডট <b>${pre.join(',')}</b> (ডিভাইস ভাইব্রেট করবে), এরপর সঠিক ডট: ` +
+      main.map(d => `<span class="pill ok" style="font-weight:700">ডট ${d}</span>`).join(' ');
   } else {
-    ui.hintBox.textContent = `Hint: ${dots.length} dot${dots.length > 1 ? 's' : ''} — ${dots.join(', ')}`;
+    ui.hintBox.innerHTML =
+      `<b>💡 ইঙ্গিত (Hint):</b> সঠিক ডট হলো — ` +
+      dots.map(d => `<span class="pill ok" style="font-weight:700">ডট ${d}</span>`).join(' ');
   }
   ui.hintBox.classList.add('show');
   playCue(54);
@@ -423,9 +439,9 @@ function submit() {
     if (!state.running) return;
     if (state.session.attemptIndex >= state.session.total) return endSession('complete');
     if (retryThisPrompt) {
-      if (action === TEACHING_ACTION.HINT) useHint();
       state.pad.reset();
       state.cell.clear();
+      if (action === TEACHING_ACTION.HINT) useHint();
       cur.promptEndMs = performance.now();
       ui.attemptNo.textContent = state.session.attemptIndex + 1;
       ui.feedback.classList.remove('show');
