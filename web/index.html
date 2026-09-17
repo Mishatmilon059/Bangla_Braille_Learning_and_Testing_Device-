@@ -235,6 +235,77 @@
   .hint-box.show { display: block; }
   .note { font-size: 0.82rem; color: var(--muted); margin-top: 12px; }
   .mono { font-family: "Outfit", ui-monospace, monospace; }
+
+  /* --- profile screen ---------------------------------------------------- */
+  #profileScreen {
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(59,130,246,0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(99,102,241,0.12) 0%, transparent 50%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  #profileScreen.hidden { display: none; }
+  .profile-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 24px; padding: 40px 32px; width: 100%; max-width: 420px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+    text-align: center;
+  }
+  .profile-dots {
+    display: grid; grid-template-columns: repeat(2,18px); grid-template-rows: repeat(3,18px);
+    gap: 8px; justify-content: center; margin: 0 auto 24px;
+    width: fit-content;
+  }
+  .profile-dots span {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--dot-off); border: 1.5px solid var(--line);
+    transition: background 0.3s;
+  }
+  .profile-dots span.on { background: var(--accent); box-shadow: 0 0 10px rgba(59,130,246,0.6); border-color: #60a5fa; }
+  .profile-card h1 {
+    font-size: 1.6rem; font-weight: 700; margin: 0 0 6px;
+    font-family: "Outfit", "Hind Siliguri", sans-serif;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .profile-card p { color: var(--muted); font-size: 0.9rem; margin: 0 0 28px; }
+  .profile-field { text-align: left; margin-bottom: 16px; }
+  .profile-field label { font-size: 0.82rem; color: var(--muted); font-weight: 600; margin-bottom: 6px; display: block; }
+  .profile-field input.error { border-color: var(--bad); }
+
+  /* --- user avatar in header --------------------------------------------- */
+  .user-badge {
+    display: none; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 12px 6px 6px;
+  }
+  .user-badge.show { display: flex; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-grad); color: #fff;
+    font-size: 0.78rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .user-badge .uname { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+  .user-badge .uid   { font-size: 0.75rem; color: var(--muted); }
+  .user-badge button.ghost {
+    padding: 4px 10px; font-size: 0.75rem; border-radius: 999px; margin: 0;
+    box-shadow: none;
+  }
+
+  /* --- collapsible panels ------------------------------------------------- */
+  .panel-toggle {
+    background: none; border: none; box-shadow: none; color: var(--muted);
+    font-size: 0.8rem; padding: 0 8px; cursor: pointer; transform: none;
+    font-weight: 600; transition: color 0.2s;
+  }
+  .panel-toggle:hover { color: var(--text); transform: none; filter: none; box-shadow: none; }
+  .collapsible-body { overflow: hidden; transition: max-height 0.3s ease; }
+  .collapsible-body.collapsed { max-height: 0 !important; }
 </style>
 </head>
 <body>
@@ -242,45 +313,49 @@
 
   <header>
     <h1>বাংলা ব্রেইল</h1>
-    <span class="sub">Bangla Braille Tutor — AI Data Collection</span>
-    <a href="teacher.html" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#10b981; color:#ffffff; padding:6px 14px; border-radius:999px; font-size:0.85rem; font-weight:600; box-shadow:0 2px 10px rgba(16,185,129,0.3);">👩‍🏫 শিক্ষক প্যানেল</a>
+    <span class="grow"></span>
+    <div class="user-badge" id="userBadge">
+      <div class="avatar" id="userAvatar"></div>
+      <div>
+        <div class="uname" id="userName"></div>
+        <div class="uid" id="userIdDisplay"></div>
+      </div>
+      <button class="ghost" id="changeProfileBtn">পরিবর্তন</button>
+    </div>
+    <a href="teacher.html" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#10b981; color:#ffffff; padding:6px 14px; border-radius:999px; font-size:0.85rem; font-weight:600; box-shadow:0 2px 10px rgba(16,185,129,0.3);">👩‍🏫 শিক্ষক</a>
     <span id="syncStatus">not started</span>
   </header>
 
   <!-- ---------------- setup ---------------- -->
   <div class="panel" id="setup">
-    <h2>Session setup</h2>
+    <h2>অনুশীলন শুরু করুন</h2>
     <div class="row">
       <div>
-        <label for="userId">Participant code</label>
-        <input id="userId" placeholder="P01" autocomplete="off">
-      </div>
-      <div>
-        <label for="mode">Collection mode</label>
+        <label for="mode">মোড</label>
         <select id="mode">
-          <option value="normal">Normal practice</option>
-          <option value="targeted">Targeted — drive rare classes</option>
-          <option value="review">Review — weak characters only</option>
+          <option value="normal">স্বাভাবিক</option>
+          <option value="targeted">লক্ষ্যভিত্তিক</option>
+          <option value="review">পুনরালোচনা</option>
         </select>
       </div>
       <div>
-        <label for="setLen">Attempts this session</label>
+        <label for="setLen">প্রতি সেশনে attempts</label>
         <input id="setLen" type="number" value="20" min="5" max="100">
       </div>
       <div>
-        <label for="charSet">Character set</label>
+        <label for="charSet">অক্ষর সেট</label>
         <select id="charSet">
-          <option value="vowels">Vowels only (11)</option>
-          <option value="all" selected>All letters (50)</option>
-          <option value="consonants">Consonants only (39)</option>
+          <option value="vowels">স্বরবর্ণ (১১)</option>
+          <option value="all" selected>সব অক্ষর (৫০)</option>
+          <option value="consonants">ব্যঞ্জনবর্ণ (৩৯)</option>
         </select>
       </div>
     </div>
     <div class="actions">
-      <button id="startBtn">Start session</button>
-      <button id="exportBtn" class="ghost">Export CSV</button>
-      <button id="flushBtn"  class="ghost">Retry queued rows</button>
-      <button id="resetBtn"  class="ghost">Reset this participant</button>
+      <button id="startBtn">▶ সেশন শুরু করো</button>
+      <button id="exportBtn" class="ghost">CSV ডাউনলোড</button>
+      <button id="flushBtn"  class="ghost">Sync করো</button>
+      <button id="resetBtn"  class="ghost">রিসেট</button>
     </div>
     <p class="note" id="modeNote"></p>
   </div>
@@ -329,60 +404,90 @@
 
   <!-- ---------------- live stats ---------------- -->
   <div class="panel">
-    <h2>Progress</h2>
+    <h2>অগ্রগতি</h2>
     <div class="stats">
-      <div class="stat"><div class="v" id="stRows">0</div>   <div class="k">rows logged</div></div>
-      <div class="stat"><div class="v" id="stAcc">—</div>    <div class="k">accuracy</div></div>
-      <div class="stat"><div class="v" id="stSess">0</div>   <div class="k">sessions</div></div>
-      <div class="stat"><div class="v" id="stDays">0</div>   <div class="k">distinct days</div></div>
-      <div class="stat"><div class="v" id="stChars">0</div>  <div class="k">chars seen</div></div>
-      <div class="stat"><div class="v" id="stQueue">0</div>  <div class="k">queued offline</div></div>
+      <div class="stat"><div class="v" id="stRows">0</div>   <div class="k">মোট attempt</div></div>
+      <div class="stat"><div class="v" id="stAcc">—</div>    <div class="k">নির্ভুলতা</div></div>
+      <div class="stat"><div class="v" id="stSess">0</div>   <div class="k">সেশন</div></div>
+      <div class="stat"><div class="v" id="stDays">0</div>   <div class="k">দিন</div></div>
+      <div class="stat"><div class="v" id="stChars">0</div>  <div class="k">অক্ষর দেখা</div></div>
+      <div class="stat"><div class="v" id="stQueue">0</div>  <div class="k">sync বাকি</div></div>
     </div>
-    <p class="note">
-      <b>Distinct days matters.</b> Features 8 and 10 (<span class="mono">session_number</span>,
-      <span class="mono">time_since_last_practice</span>) carry no signal if every session
-      happens in one sitting. Spread sessions across several days per participant.
-    </p>
   </div>
 
-  <!-- ---------------- class balance ---------------- -->
+  <!-- ---------------- per-character mastery (collapsible) ---------------- -->
   <div class="panel">
-    <h2>Class balance — watch this while collecting</h2>
-    <div class="row">
-      <div>
-        <table id="taTable">
-          <thead><tr><th>Teaching action</th><th class="num">rows</th><th style="width:90px"></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div>
-        <table id="csTable">
-          <thead><tr><th>Confidence state</th><th class="num">rows</th><th style="width:90px"></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <h2>
+      অক্ষরভিত্তিক দক্ষতা
+      <button class="panel-toggle" id="charToggle" onclick="togglePanel('charBody','charToggle')">▾ দেখাও</button>
+    </h2>
+    <div class="collapsible-body collapsed" id="charBody" style="max-height:2000px">
+      <table id="charTable">
+        <thead><tr>
+          <th>অক্ষর</th><th>নাম</th><th class="num">seen</th><th class="num">acc</th>
+          <th style="width:110px">mastery</th><th class="num">streak</th><th class="num">ভুল</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
-    <p class="note">
-      Target ≥30 rows per class before training. Classes stuck near zero in normal
-      use are what <span class="mono">targeted</span> mode and
-      <span class="mono">tools/gen_synthetic.py</span> exist to fill.
-    </p>
   </div>
 
-  <!-- ---------------- per-character mastery ---------------- -->
+  <!-- ---------------- class balance (collapsible, researcher) ------------- -->
   <div class="panel">
-    <h2>Per-character mastery</h2>
-    <table id="charTable">
-      <thead><tr>
-        <th>Char</th><th>Name</th><th class="num">seen</th><th class="num">acc</th>
-        <th style="width:110px">mastery</th><th class="num">streak</th><th class="num">mistakes</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table>
+    <h2>
+      ডেটা ব্যালেন্স
+      <button class="panel-toggle" id="balToggle" onclick="togglePanel('balBody','balToggle')">▾ দেখাও</button>
+    </h2>
+    <div class="collapsible-body collapsed" id="balBody" style="max-height:600px">
+      <div class="row">
+        <div>
+          <table id="taTable">
+            <thead><tr><th>Teaching action</th><th class="num">rows</th><th style="width:90px"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div>
+          <table id="csTable">
+            <thead><tr><th>Confidence state</th><th class="num">rows</th><th style="width:90px"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
 
+<!-- ---------------- profile screen overlay ---------------- -->
+<div id="profileScreen">
+  <div class="profile-card">
+    <div class="profile-dots">
+      <span class="on"></span><span></span>
+      <span class="on"></span><span class="on"></span>
+      <span></span><span class="on"></span>
+    </div>
+    <h1>বাংলা ব্রেইল</h1>
+    <p>অনুশীলন শুরু করার আগে আপনার তথ্য দিন</p>
+    <div class="profile-field">
+      <label for="profileName">আপনার নাম</label>
+      <input id="profileName" placeholder="যেমন: রাহেলা" autocomplete="name">
+    </div>
+    <div class="profile-field">
+      <label for="profileId">আইডি</label>
+      <input id="profileId" placeholder="যেমন: S01" autocomplete="off" style="text-transform:uppercase">
+    </div>
+    <button id="profileSaveBtn" style="width:100%; margin-top:8px; padding:14px; font-size:1rem;">শুরু করো →</button>
+  </div>
+</div>
+
+<script>
+function togglePanel(bodyId, btnId) {
+  const body = document.getElementById(bodyId);
+  const btn  = document.getElementById(btnId);
+  const collapsed = body.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '▾ দেখাও' : '▴ লুকাও';
+}
+</script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

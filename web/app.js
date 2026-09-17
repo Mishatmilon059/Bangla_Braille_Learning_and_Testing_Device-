@@ -17,8 +17,36 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 import { FALLBACK_MAP } from './braille_map_fallback.js';
 
-const MAX_TRIES_PER_PROMPT = 4;   // then move on regardless
+const MAX_TRIES_PER_PROMPT = 4;
 const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// profile -- persisted name + id, shown before the app loads
+// ---------------------------------------------------------------------------
+
+const PROFILE_KEY = 'braille.profile';
+
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch { return null; }
+}
+
+function saveProfile(name, userId) {
+  const p = { name: name.trim(), userId: userId.trim().toUpperCase(), createdAt: new Date().toISOString() };
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+  return p;
+}
+
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function showUserBadge(profile) {
+  const badge = $('userBadge');
+  $('userAvatar').textContent    = initials(profile.name);
+  $('userName').textContent      = profile.name;
+  $('userIdDisplay').textContent = profile.userId;
+  badge.classList.add('show');
+}
 
 // ং ঃ ঁ are combining marks. Rendered alone a font shows them over a dotted
 // circle, which reads as a broken glyph. Attach U+25CC explicitly so it is
@@ -29,7 +57,7 @@ const displayChar = (ch) => (COMBINING.has(ch) ? '◌' + ch : ch);
 const ui = {
   syncStatus: $('syncStatus'),
   setup: $('setup'), practice: $('practice'),
-  userId: $('userId'), mode: $('mode'), setLen: $('setLen'), charSet: $('charSet'),
+  mode: $('mode'), setLen: $('setLen'), charSet: $('charSet'),
   startBtn: $('startBtn'), exportBtn: $('exportBtn'), flushBtn: $('flushBtn'),
   resetBtn: $('resetBtn'), modeNote: $('modeNote'),
   attemptNo: $('attemptNo'), attemptTotal: $('attemptTotal'), diffLevel: $('diffLevel'),
@@ -60,6 +88,16 @@ const state = {
 // ---------------------------------------------------------------------------
 
 async function boot() {
+  // Profile gate: show profile screen on first visit
+  const profile = loadProfile();
+  if (!profile) {
+    wireProfileEvents();
+    return;                   // profileScreen is visible by default (no .hidden)
+  }
+
+  $('profileScreen').classList.add('hidden');
+  showUserBadge(profile);
+
   let map = null;
   try {
     let res = await fetch('./data/braille_map.json').catch(() => null);
@@ -90,12 +128,50 @@ async function boot() {
 
   checkSupabase();
 
-  ui.userId.value = localStorage.getItem('braille.lastUser') || 'P01';
   ui.setLen.value = SESSION_TARGET_ATTEMPTS;
   loadLearner();
 
   wireEvents();
+  wireProfileEvents();
   renderAll();
+}
+
+function wireProfileEvents() {
+  const saveBtn = $('profileSaveBtn');
+  const changeBtn = $('changeProfileBtn');
+
+  if (saveBtn && !saveBtn._wired) {
+    saveBtn._wired = true;
+    saveBtn.addEventListener('click', () => {
+      const name = ($('profileName').value || '').trim();
+      const userId = ($('profileId').value || '').trim().toUpperCase();
+      if (!name || !userId) {
+        $('profileName').classList.toggle('error', !name);
+        $('profileId').classList.toggle('error', !userId);
+        return;
+      }
+      saveProfile(name, userId);
+      $('profileScreen').classList.add('hidden');
+      boot();
+    });
+    // Allow Enter key in profile fields
+    ['profileName', 'profileId'].forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); });
+    });
+  }
+
+  if (changeBtn && !changeBtn._wired) {
+    changeBtn._wired = true;
+    changeBtn.addEventListener('click', () => {
+      const p = loadProfile();
+      if (p) {
+        $('profileName').value = p.name;
+        $('profileId').value = p.userId;
+      }
+      $('profileScreen').classList.remove('hidden');
+    });
+  }
 }
 
 async function checkSupabase() {
@@ -122,9 +198,8 @@ async function checkSupabase() {
 }
 
 async function loadLearner() {
-  const id = (ui.userId.value || 'P01').trim();
+  const id = loadProfile()?.userId || 'P01';
   state.learner = new LearnerState(id);
-  localStorage.setItem('braille.lastUser', id);
   if (state.logger && state.logger.configured) {
     await state.logger.syncRemoteForUser(id, state.learner);
     renderAll();
@@ -132,7 +207,6 @@ async function loadLearner() {
 }
 
 function wireEvents() {
-  ui.userId.addEventListener('change', () => { loadLearner(); renderAll(); });
   ui.mode.addEventListener('change', () => { ui.modeNote.textContent = MODE_NOTES[ui.mode.value]; });
   ui.modeNote.textContent = MODE_NOTES[ui.mode.value];
 
