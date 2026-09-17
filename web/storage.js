@@ -224,7 +224,13 @@ export class AttemptLogger {
     this.flushing = true;
     try {
       // Send as one batch; Supabase accepts an array insert.
-      const batch = this.queue.slice(0, 100);
+      // Sanitize streak fields: the DB enforces current_streak=0 OR wrong_streak=0.
+      // Old rows in the queue may violate this; use is_correct as the truth source.
+      const batch = this.queue.slice(0, 100).map((r) => {
+        if (r.is_correct && r.wrong_streak > 0) return { ...r, wrong_streak: 0 };
+        if (!r.is_correct && r.current_streak > 0) return { ...r, current_streak: 0 };
+        return r;
+      });
       const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts`, {
         method: 'POST',
         headers: {
