@@ -81,6 +81,11 @@ async function boot() {
     ui.syncStatus.className = kind === 'ok' ? 'ok' : kind === 'error' ? 'error'
       : kind === 'pending' ? 'pending' : '';
     ui.syncStatus.textContent = msg;
+    ui.syncStatus.title = kind === 'error' ? 'Click to retry' : '';
+    ui.syncStatus.style.cursor = kind === 'error' ? 'pointer' : '';
+  });
+  ui.syncStatus.addEventListener('click', () => {
+    if (state.logger) state.logger.retryNow();
   });
 
   checkSupabase();

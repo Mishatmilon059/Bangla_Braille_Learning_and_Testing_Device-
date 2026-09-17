@@ -193,6 +193,7 @@ export class AttemptLogger {
     this.queue = readJSON(QUEUE_KEY, []);
     this.rows = readJSON(ROWS_KEY, []);
     this.flushing = false;
+    this._retryTimer = null;
     this.configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
     addEventListener('online', () => this.flush());
   }
@@ -250,12 +251,29 @@ export class AttemptLogger {
       const body = await res.text();
       this.onStatus('error', `sync failed ${res.status} — ${this.queue.length} queued`);
       console.error('Supabase insert failed', res.status, body);
+      this._scheduleRetry();
     } catch (err) {
       this.onStatus('error', `offline — ${this.queue.length} queued`);
       console.error('Supabase insert threw', err);
+      this._scheduleRetry();
     } finally {
       this.flushing = false;
     }
+  }
+
+  _scheduleRetry(delayMs = 30000) {
+    if (this._retryTimer) return;
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = null;
+      this.flush();
+    }, delayMs);
+  }
+
+  /** Force an immediate retry of any queued rows. */
+  retryNow() {
+    clearTimeout(this._retryTimer);
+    this._retryTimer = null;
+    this.flush();
   }
 
   async syncRemoteForUser(userId, learner) {

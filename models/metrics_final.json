@@ -1,0 +1,72 @@
+{
+  "features": [
+    "response_time",
+    "press_duration",
+    "retry_count",
+    "prev_accuracy",
+    "prev_mastery",
+    "hint_count",
+    "current_streak",
+    "wrong_streak"
+  ],
+  "feature_count": 8,
+  "dataset": {
+    "real": 923,
+    "synthetic": 1303,
+    "total": 2226
+  },
+  "split": {
+    "train": 1558,
+    "val": 334,
+    "test": 334,
+    "real_in_test": 127
+  },
+  "test_accuracy": {
+    "teaching_combined": 0.985,
+    "teaching_real_only": 0.9606,
+    "teaching_majority": 0.4611,
+    "confidence_combined": 0.9162,
+    "confidence_real_only": 0.8976,
+    "confidence_majority": 0.4431
+  },
+  "per_class_ta": {
+    "REPEAT": {
+      "n_test": 90,
+      "recall": 1.0,
+      "precision": 0.989,
+      "f1": 0.9945
+    },
+    "HINT": {
+      "n_test": 90,
+      "recall": 0.9889,
+      "precision": 0.957,
+      "f1": 0.9727
+    },
+    "NORMAL_PRACTICE": {
+      "n_test": 154,
+      "recall": 0.974,
+      "precision": 1.0,
+      "f1": 0.9868
+    }
+  },
+  "per_class_cs": {
+    "CONFIDENT": {
+      "n_test": 101,
+      "recall": 0.9604,
+      "precision": 0.951,
+      "f1": 0.9557
+    },
+    "HESITANT": {
+      "n_test": 148,
+      "recall": 0.8851,
+      "precision": 0.9225,
+      "f1": 0.9034
+    },
+    "GUESSING": {
+      "n_test": 85,
+      "recall": 0.9176,
+      "precision": 0.8667,
+      "f1": 0.8914
+    }
+  }
+}
