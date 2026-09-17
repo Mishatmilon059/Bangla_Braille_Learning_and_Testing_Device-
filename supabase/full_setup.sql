@@ -85,6 +85,8 @@ create table if not exists remote_commands (
   letter_id   smallint,
   dot         smallint,
   command     text        not null default 'play',
+  test_index  smallint,   -- 0-based position of this letter within its test batch
+  test_total  smallint,   -- how many letters are in this test batch
 
   constraint remote_commands_dot_range    check (dot is null or dot between 1 and 6),
   constraint remote_commands_letter_range check (letter_id is null or letter_id between 0 and 49)
@@ -94,6 +96,8 @@ create table if not exists remote_commands (
 alter table remote_commands add column if not exists command text not null default 'play';
 alter table remote_commands add column if not exists dot smallint;
 alter table remote_commands add column if not exists letter_id smallint;
+alter table remote_commands add column if not exists test_index smallint;
+alter table remote_commands add column if not exists test_total smallint;
 
 create index if not exists remote_commands_device_idx on remote_commands (device_id, id);
 

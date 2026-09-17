@@ -120,7 +120,7 @@ function startPoll() {
   S.sessionStart = new Date().toISOString();
   S.lastAttemptId = null;
   clearInterval(S.pollTimer);
-  S.pollTimer = setInterval(pollAttempts, 500);
+  S.pollTimer = setInterval(pollAttempts, 200);
   setEspStatus('connected');
 }
 
@@ -139,13 +139,15 @@ async function pollAttempts() {
   }
 }
 
-async function sendPlay(letterId, isTest = false) {
-  await sbPost('remote_commands', {
+async function sendPlay(letterId, isTest = false, testIndex = null, testTotal = null) {
+  const body = {
     device_id: S.deviceId,
     letter_id: letterId,
     command:   isTest ? 'test' : 'play',
     created_at: new Date().toISOString(),
-  });
+  };
+  if (isTest) { body.test_index = testIndex; body.test_total = testTotal; }
+  await sbPost('remote_commands', body);
 }
 
 // ─── Attempt handler ──────────────────────────────────────────────────────────
@@ -177,7 +179,7 @@ function handleAttempt(row) {
       setTimeout(testShowResults, 800);
     } else {
       S.testQIdx++;
-      sendPlay(S.testQueue[S.testQIdx].id, true);
+      sendPlay(S.testQueue[S.testQIdx].id, true, S.testQIdx, S.testQueue.length);
       renderTestQuestion();
     }
   }
@@ -459,12 +461,8 @@ function testStart() {
   S.testQueue    = [...S.testSelected].map(id => LETTERS[id]).sort(() => Math.random() - 0.5);
 
   showScreen('test-run');
-  sendPlay(S.testQueue[0].id, true);
+  sendPlay(S.testQueue[0].id, true, 0, S.testQueue.length);
   renderTestQuestion();
-
-  // Clear sim dots
-  S.simDots.clear();
-  document.querySelectorAll('.sim-dot').forEach(b => b.classList.remove('on'));
 }
 
 function renderTestQuestion() {
@@ -579,13 +577,12 @@ function simToggleDot(d) {
 }
 
 async function simSubmit() {
-  const letter = S.screen === 'learn' && S.learnMode === 'seq'
+  // Learn screen only -- test mode has no web input path (see init()).
+  const letter = S.learnMode === 'seq'
     ? LETTERS[S.seqIdx]
-    : S.screen === 'learn' && S.rndSelected !== null
+    : S.rndSelected !== null
       ? LETTERS[S.rndSelected]
-      : S.screen === 'test-run'
-        ? S.testQueue[S.testQIdx]
-        : null;
+      : null;
 
   if (!letter) { showToast('প্রথমে একটি বর্ণ বাজান'); return; }
 
@@ -727,13 +724,13 @@ export async function init() {
   el('btn-res-retry').addEventListener('click', testInit);
   el('btn-res-home').addEventListener('click', () => showScreen('learn'));
 
-  // Hardware simulator (all .sim-dot buttons across all screens share simDots state)
+  // Hardware simulator -- Learn screen only. Test mode has no web input path:
+  // the student must answer on the physical ESP32 buttons, so the simulator
+  // is intentionally not present on screen-test-run.
   document.querySelectorAll('.sim-dot').forEach(btn =>
     btn.addEventListener('click', () => simToggleDot(+btn.dataset.dot)));
   el('btn-sim-clear').addEventListener('click', simClear);
   el('btn-sim-submit').addEventListener('click', simSubmit);
-  el('btn-sim-clear2').addEventListener('click', simClear);
-  el('btn-sim-submit2').addEventListener('click', simSubmit);
 
   // Bottom nav
   el('nav-dash').addEventListener('click',  () => showScreen('learn'));
@@ -745,3 +742,5 @@ export async function init() {
   seqRender();
   startPoll();
 }
+
+init();

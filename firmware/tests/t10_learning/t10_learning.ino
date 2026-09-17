@@ -26,7 +26,7 @@
 #define DOT_ON_MS     500    // how long each dot's motor buzzes
 #define DOT_GAP_MS    500    // silence after each motor, within a pattern
 #define STAGE_GAP_MS  1200   // silence between stage1 and stage2 vibrations
-#define POLL_MS       700
+#define POLL_MS       250   // safe to poll fast now that the TLS connection is reused
 #define DEVICE_ID  "esp32_01"
 
 static const char *SUPABASE_URL      = "https://rufaacgatrebsyxnyfbq.supabase.co";
@@ -34,6 +34,22 @@ static const char *SUPABASE_ANON_KEY = "sb_publishable_lI3qv5Xk44GAhzL4R7I2GA_4k
 
 static long     g_last_id   = -1;
 static uint32_t g_last_poll = 0;
+
+// A fresh WiFiClientSecure means a full TLS handshake (0.5-3s on ESP32) --
+// expensive enough that doing it on every 700ms poll makes the whole loop
+// feel laggy even though it "works". Keeping one client + reusing the
+// connection (setReuse) across requests to the same host avoids repeating
+// that handshake on every poll.
+static WiFiClientSecure g_https;
+static bool             g_https_ready = false;
+
+static WiFiClientSecure &https_client() {
+  if (!g_https_ready) {
+    g_https.setInsecure();
+    g_https_ready = true;
+  }
+  return g_https;
+}
 
 // ---------------------------------------------------------------------------
 // WiFi
@@ -64,10 +80,10 @@ static void sync_latest_id() {
     if (WiFi.status() != WL_CONNECTED) wifi_connect();
     delay(300);
 
-    WiFiClientSecure client; client.setInsecure();
     HTTPClient http;
-    http.begin(client, String(SUPABASE_URL) +
+    http.begin(https_client(), String(SUPABASE_URL) +
       "/rest/v1/remote_commands?order=id.desc&limit=1&select=id");
+    http.setReuse(true);
     http.addHeader("apikey",        SUPABASE_ANON_KEY);
     http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
 
@@ -95,14 +111,14 @@ static void sync_latest_id() {
 static int poll_supabase() {
   if (WiFi.status() != WL_CONNECTED) { wifi_connect(); return -1; }
 
-  WiFiClientSecure client; client.setInsecure();
   HTTPClient http;
   String url = String(SUPABASE_URL) + "/rest/v1/remote_commands"
     + "?device_id=eq." + DEVICE_ID
     + "&id=gt."        + String(g_last_id)
     + "&order=id.asc&limit=1&select=id,letter_id";
 
-  http.begin(client, url);
+  http.begin(https_client(), url);
+  http.setReuse(true);
   http.addHeader("apikey",        SUPABASE_ANON_KEY);
   http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
 
