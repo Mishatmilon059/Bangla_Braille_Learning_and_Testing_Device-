@@ -20,6 +20,7 @@
 #include "model_data.h"
 
 #include <TensorFlowLite_ESP32.h>
+#include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -73,7 +74,12 @@ void setup() {
   resolver.AddQuantize();
   resolver.AddDequantize();
 
-  static tflite::MicroInterpreter iface(model, resolver, arena, sizeof(arena));
+  // TensorFlowLite_ESP32 1.0.0 predates the TFLM release that dropped the
+  // ErrorReporter argument, so it is required here. It is also what turns a
+  // failed Invoke into a printed reason instead of a silent wrong answer.
+  static tflite::MicroErrorReporter micro_error_reporter;
+  static tflite::MicroInterpreter iface(model, resolver, arena, sizeof(arena),
+                                        &micro_error_reporter);
   interpreter = &iface;
   if (interpreter->AllocateTensors() != kTfLiteOk) {
     Serial.println("FAIL: AllocateTensors -- raise MODEL_ARENA_SIZE in model_data.h");
@@ -81,19 +87,50 @@ void setup() {
   }
 
   input = interpreter->input(0);
-  for (size_t i = 0; i < interpreter->outputs_size(); i++) {
-    TfLiteTensor *t = interpreter->output(i);
-    int n = t->dims->data[t->dims->size - 1];
-    if (n == MODEL_CONF_CLASSES) out_conf = t;
-    else if (n == MODEL_TEACH_CLASSES) out_teach = t;
+  // The head positions come from model_data.h, resolved from the flatbuffer's
+  // signature when the header was generated. Matching by class count here would
+  // pick the same tensor for both heads -- they are the same width.
+  if ((int)interpreter->outputs_size() <= MODEL_CONF_OUTPUT_INDEX ||
+      (int)interpreter->outputs_size() <= MODEL_TEACH_OUTPUT_INDEX) {
+    Serial.printf("FAIL: model has %u outputs, header expects %d and %d\n",
+                  (unsigned)interpreter->outputs_size(),
+                  MODEL_CONF_OUTPUT_INDEX, MODEL_TEACH_OUTPUT_INDEX);
+    while (true) delay(1000);
   }
-  if (!out_conf || !out_teach) {
-    Serial.println("FAIL: could not match outputs to heads");
+  out_conf = interpreter->output(MODEL_CONF_OUTPUT_INDEX);
+  out_teach = interpreter->output(MODEL_TEACH_OUTPUT_INDEX);
+  if (out_conf->dims->data[out_conf->dims->size - 1] != MODEL_CONF_CLASSES ||
+      out_teach->dims->data[out_teach->dims->size - 1] != MODEL_TEACH_CLASSES) {
+    Serial.println("FAIL: head widths disagree with model_data.h -- stale header");
     while (true) delay(1000);
   }
 
   Serial.printf("arena used %u of %u bytes  <- you can shrink MODEL_ARENA_SIZE to this\n",
                 (unsigned)interpreter->arena_used_bytes(), (unsigned)sizeof(arena));
+
+  // Dump the raw int8 of every output for the first vector. When a head
+  // disagrees with the desktop, these numbers say whether the kernel computed
+  // something different or the firmware simply read the wrong tensor.
+  for (int i = 0; i < FEATURE_COUNT; i++) {
+    int32_t q = (int32_t)lroundf(GOLDEN_VECTORS[0].features_norm[i] / MODEL_INPUT_SCALE)
+                + MODEL_INPUT_ZERO_POINT;
+    q = q < -128 ? -128 : (q > 127 ? 127 : q);
+    input->data.int8[i] = (int8_t)q;
+  }
+  // Print the input BEFORE Invoke: the arena reuses the input buffer for a
+  // later tensor, so reading it afterwards shows that tensor, not the input.
+  Serial.print("golden[0] input q  :");
+  for (int i = 0; i < FEATURE_COUNT; i++) Serial.printf(" %d", input->data.int8[i]);
+  Serial.printf("   (input type=%d)\n", (int)input->type);
+  interpreter->Invoke();
+  for (size_t o = 0; o < interpreter->outputs_size(); o++) {
+    TfLiteTensor *t = interpreter->output(o);
+    int n = t->dims->data[t->dims->size - 1];
+    Serial.printf("golden[0] output(%u): type=%d n=%d raw =", (unsigned)o, (int)t->type, n);
+    for (int i = 0; i < n; i++) Serial.printf(" %d", t->data.int8[i]);
+    Serial.println();
+  }
+  Serial.println();
 
   // --- the actual check ---------------------------------------------------
   int fails = 0;

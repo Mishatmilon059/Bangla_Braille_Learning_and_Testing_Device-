@@ -1,0 +1,61 @@
+{
+  "dataset": {
+    "real": 743,
+    "synthetic": 3036,
+    "total": 3779
+  },
+  "split": {
+    "train": 2645,
+    "val": 567,
+    "test": 567,
+    "real_in_test": 119
+  },
+  "test_accuracy": {
+    "teaching_combined": 1.0,
+    "teaching_real_only": 1.0,
+    "teaching_majority": 0.4709,
+    "confidence_combined": 0.9788,
+    "confidence_real_only": 0.9664,
+    "confidence_majority": 0.3598
+  },
+  "per_class_ta": {
+    "REPEAT": {
+      "n_test": 150,
+      "recall": 1.0,
+      "precision": 1.0,
+      "f1": 1.0
+    },
+    "HINT": {
+      "n_test": 150,
+      "recall": 1.0,
+      "precision": 1.0,
+      "f1": 1.0
+    },
+    "NORMAL_PRACTICE": {
+      "n_test": 267,
+      "recall": 1.0,
+      "precision": 1.0,
+      "f1": 1.0
+    }
+  },
+  "per_class_cs": {
+    "CONFIDENT": {
+      "n_test": 154,
+      "recall": 1.0,
+      "precision": 0.9686,
+      "f1": 0.984
+    },
+    "HESITANT": {
+      "n_test": 204,
+      "recall": 0.9461,
+      "precision": 0.9948,
+      "f1": 0.9698
+    },
+    "GUESSING": {
+      "n_test": 209,
+      "recall": 0.9952,
+      "precision": 0.972,
+      "f1": 0.9835
+    }
+  }
+}

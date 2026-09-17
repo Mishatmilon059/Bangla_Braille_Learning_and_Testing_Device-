@@ -30,6 +30,7 @@
 
 // --- TFLite Micro ----------------------------------------------------------
 #include <TensorFlowLite_ESP32.h>
+#include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
@@ -39,8 +40,8 @@ namespace {
 const tflite::Model *g_model = nullptr;
 tflite::MicroInterpreter *g_interpreter = nullptr;
 TfLiteTensor *g_input = nullptr;
-TfLiteTensor *g_out_conf = nullptr;    // 3 classes
-TfLiteTensor *g_out_teach = nullptr;   // 6 classes
+TfLiteTensor *g_out_conf = nullptr;    // MODEL_CONF_CLASSES
+TfLiteTensor *g_out_teach = nullptr;   // MODEL_TEACH_CLASSES
 alignas(16) uint8_t g_arena[MODEL_ARENA_SIZE];
 }  // namespace
 
@@ -74,7 +75,11 @@ static bool model_begin() {
   resolver.AddQuantize();
   resolver.AddDequantize();
 
-  static tflite::MicroInterpreter interpreter(g_model, resolver, g_arena, sizeof(g_arena));
+  // TensorFlowLite_ESP32 1.0.0 predates the TFLM release that dropped the
+  // ErrorReporter argument, so it is required here.
+  static tflite::MicroErrorReporter micro_error_reporter;
+  static tflite::MicroInterpreter interpreter(g_model, resolver, g_arena, sizeof(g_arena),
+                                              &micro_error_reporter);
   g_interpreter = &interpreter;
   if (g_interpreter->AllocateTensors() != kTfLiteOk) {
     Serial.println("AllocateTensors failed -- raise MODEL_ARENA_SIZE");
@@ -82,16 +87,21 @@ static bool model_begin() {
   }
 
   g_input = g_interpreter->input(0);
-  // Match outputs by class count rather than index: the converter does not
-  // promise to preserve the order the Keras model declared them in.
-  for (size_t i = 0; i < g_interpreter->outputs_size(); i++) {
-    TfLiteTensor *t = g_interpreter->output(i);
-    int n = t->dims->data[t->dims->size - 1];
-    if (n == MODEL_CONF_CLASSES) g_out_conf = t;
-    else if (n == MODEL_TEACH_CLASSES) g_out_teach = t;
+  // The converter does not preserve the order the Keras model declared its
+  // outputs in, and both heads are the same width, so neither position nor
+  // class count is safe to assume here. tools/tflite_to_header.py resolves the
+  // mapping from the flatbuffer's signature and bakes it into model_data.h.
+  if ((int)g_interpreter->outputs_size() <= MODEL_CONF_OUTPUT_INDEX ||
+      (int)g_interpreter->outputs_size() <= MODEL_TEACH_OUTPUT_INDEX) {
+    Serial.println("model output count disagrees with model_data.h");
+    return false;
   }
-  if (!g_input || !g_out_conf || !g_out_teach) {
-    Serial.println("could not match model outputs to heads");
+  g_out_conf = g_interpreter->output(MODEL_CONF_OUTPUT_INDEX);
+  g_out_teach = g_interpreter->output(MODEL_TEACH_OUTPUT_INDEX);
+  if (!g_input || !g_out_conf || !g_out_teach ||
+      g_out_conf->dims->data[g_out_conf->dims->size - 1] != MODEL_CONF_CLASSES ||
+      g_out_teach->dims->data[g_out_teach->dims->size - 1] != MODEL_TEACH_CLASSES) {
+    Serial.println("model outputs do not match model_data.h -- stale header");
     return false;
   }
 
@@ -159,14 +169,6 @@ static uint8_t pick_letter(uint8_t prev_action, uint8_t prev_id, bool have_prev)
   // Mirrors pickLetter() in web/app.js.
   if (have_prev && (prev_action == TA_REPEAT || prev_action == TA_HINT)) return prev_id;
 
-  if (have_prev && prev_action == TA_REVIEW_PREVIOUS) {
-    uint8_t weak[BRAILLE_LETTER_COUNT];
-    int n = 0;
-    for (int i = 0; i < BRAILLE_LETTER_COUNT; i++)
-      if (g_state.chars[i].seen > 0 && g_state.chars[i].mastery < 0.6f) weak[n++] = i;
-    if (n > 0) return weak[random(n)];
-  }
-
   // weight inversely to mastery so weak characters recur more often
   float weights[BRAILLE_LETTER_COUNT], total = 0.0f;
   for (int i = 0; i < BRAILLE_LETTER_COUNT; i++) {
@@ -222,24 +224,28 @@ static void log_attempt(uint8_t id, const Features *f, uint8_t action, uint8_t c
 static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   CharState *c = char_state(id);
   uint8_t expected = BRAILLE_PATTERN[id];
+  uint8_t prefix   = BRAILLE_PREFIX[id];
 
   // --- prompt ---------------------------------------------------------
   buttons_reset_attempt();
+  submit_reset_attempt();
   audio_play_blocking(braille_track(id));
-  uint32_t prompt_end_ms = millis();   // clock starts when the prompt ENDS
+  // Two-cell characters: vibrate the prefix cell so the learner knows the
+  // character requires a prefix, then pause before they enter the answer cell.
+  if (prefix) {
+    motors_show_pattern(prefix, 350);
+    delay(600);
+  }
+  uint32_t prompt_end_ms = millis();   // clock starts when the full prompt ENDS
 
   // --- collect the answer ---------------------------------------------
-  // Submit = all six released after at least one press, or a 15 s timeout.
+  // The learner holds the dot pattern, then presses the dedicated submit
+  // button (PIN_SUBMIT). Submit = that debounced press, or a 15 s timeout.
   uint32_t deadline = prompt_end_ms + 15000;
-  bool saw_press = false;
+  bool submitted = false;
   while (millis() < deadline) {
     buttons_poll();
-    if (g_btn.mask) saw_press = true;
-    if (saw_press && !buttons_any_held()) {
-      delay(450);                       // settle window for multi-dot patterns
-      buttons_poll();
-      if (!buttons_any_held()) break;
-    }
+    if (submit_poll()) { submitted = true; break; }
     delay(3);
   }
 
@@ -253,8 +259,10 @@ static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   double pre_conf     = c->last_confidence;
   double gap_s        = time_since_last_practice(id);
 
-  double response_time = g_btn.first_press_ms
-                           ? (double)(g_btn.first_press_ms - prompt_end_ms)
+  // response_time: prompt end -> SUBMIT press, not the first dot press.
+  // Must match submit()'s responseTime calc in web/app.js exactly.
+  double response_time = submitted
+                           ? (double)(g_submit.press_ms - prompt_end_ms)
                            : (double)(millis() - prompt_end_ms);
   if (response_time < 0) response_time = 0;
 
@@ -291,9 +299,6 @@ static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   }
   c->last_confidence = confidence;
 
-  if (action == TA_INCREASE_DIFFICULTY && g_state.difficulty < 5) g_state.difficulty++;
-  else if (action == TA_REVIEW_PREVIOUS && g_state.difficulty > 1) g_state.difficulty--;
-
   // --- feedback ---------------------------------------------------------
   if (correct) {
     audio_play_blocking(51);            // "সঠিক"
@@ -301,10 +306,12 @@ static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   } else {
     audio_play_blocking(52);            // "ভুল"
     delay(120);
+    if (prefix) { motors_show_pattern(prefix, 300); delay(500); }
     motors_show_sequential(expected, 320, 180);   // feel the right answer
   }
   if (action == TA_HINT) {
     audio_play_blocking(54);
+    if (prefix) { motors_show_pattern(prefix, 300); delay(500); }
     motors_show_sequential(expected, 400, 220);
   }
 

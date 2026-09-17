@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bangla Braille Tutor — 3D Enclosure (48mm Height & Centered Submit)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #111827;
+      color: #f3f4f6;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 12px 24px;
+      background: #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #374151;
+      z-index: 10;
+    }
+    h1 { font-size: 1.1rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.5px; }
+    .badge { background: #2563eb; color: white; padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; }
+    
+    .ui-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(31, 41, 55, 0.92);
+      backdrop-filter: blur(12px);
+      padding: 18px;
+      border-radius: 12px;
+      border: 1px solid #4b5563;
+      width: 300px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+    }
+    .ui-panel h3 { font-size: 0.95rem; margin-bottom: 12px; color: #f9fafb; border-bottom: 1px solid #374151; padding-bottom: 8px; }
+    .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .btn {
+      background: #374151;
+      border: 1px solid #4b5563;
+      color: #f3f4f6;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn:hover { background: #2563eb; border-color: #60a5fa; color: white; }
+    .btn.active { background: #2563eb; border-color: #60a5fa; }
+    .btn-full { grid-column: span 2; }
+    
+    .info-footer {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(31, 41, 55, 0.92);
+      backdrop-filter: blur(12px);
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: 1px solid #4b5563;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #d1d5db;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+    }
+    .status-toast {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(16, 185, 129, 0.9);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 20;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Bangla Braille Tutor — Hardware Enclosure</h1>
+      <small style="color: #9ca3af;">ESP32 Embedded Console · 210mm × 140mm × <b>48mm (High Clearance)</b></small>
+    </div>
+    <span class="badge">Height: 48mm</span>
+  </header>
+
+  <div id="canvas-container">
+    <div id="toast" class="status-toast">Button Pressed!</div>
+
+    <div class="ui-panel">
+      <h3>🎮 Interactive Controls</h3>
+      <div class="btn-group">
+        <button class="btn btn-full" onclick="triggerAllMotors()">⚡ Test Vibration Motors</button>
+        <button class="btn" onclick="setCameraView('top')">📐 Top View</button>
+        <button class="btn" onclick="setCameraView('iso')">🧊 Isometric</button>
+        <button class="btn" onclick="setCameraView('front')">👁️ Front View</button>
+        <button class="btn" onclick="setCameraView('side')">↔️ Side View</button>
+        <button class="btn btn-full" id="btn-rotate" onclick="toggleRotation()">🔄 Pause Rotation</button>
+      </div>
+      <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 8px;">
+        💡 <b>Interactive:</b> You can click directly on the <b>Buttons</b> or <b>Motors</b> to test them!
+      </div>
+    </div>
+
+    <div class="info-footer">
+      <div>📏 <b>Dimensions:</b> 210 mm (W) × 140 mm (D) × <b>48 mm (H)</b> (Spacious for ESP32 & Wiring)</div>
+      <div>🔘 <b>Submit Button:</b> Placed horizontally centered between White and Red button columns.</div>
+    </div>
+  </div>
+
+  <script>
+    let scene, camera, renderer, controls, raycaster, mouse;
+    let mainConsole, motors = [], interactiveButtons = [];
+    let isAutoRotating = true;
+    let isVibrating = false;
+
+    // Upgraded dimensions: Height is now 48mm for plenty of internal electronics clearance
+    const W = 210, D = 140, H = 48; // mm dimensions
+
+    function init() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111827);
+
+      camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 1, 1500);
+      camera.position.set(0, 260, 260);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.maxPolarAngle = Math.PI / 2 - 0.01;
+      controls.target.set(0, 0, 0);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+      scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xffffff, 0.85);
+      mainLight.position.set(80, 220, 100);
+      mainLight.castShadow = true;
+      mainLight.shadow.mapSize.width = 2048;
+      mainLight.shadow.mapSize.height = 2048;
+      mainLight.shadow.bias = -0.0005;
+      scene.add(mainLight);
+
+      const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.4);
+      fillLight.position.set(-100, 140, -80);
+      scene.add(fillLight);
+
+      // Soft Ground Plane
+      const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+      const groundMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -H / 2 - 0.5;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      buildDevice();
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointerdown', onPointerDown);
+
+      animate();
+    }
+
+    function generateTopTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2048;
+      canvas.height = 1365;
+      const ctx = canvas.getContext('2d');
+
+      // Base Right Practice background (Beige / Off-White)
+      ctx.fillStyle = '#f1eee7';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Left Learning background (Soft Slate Blue)
+      ctx.fillStyle = '#d5e2eb';
+      ctx.beginPath();
+      ctx.roundRect(40, 40, canvas.width / 2 - 60, canvas.height - 80, 24);
+      ctx.fill();
+
+      // Outer Bezel Border
+      ctx.strokeStyle = '#9ca3af';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+      // Center Divider Line (Stops cleanly above bottom speaker)
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 10;
+      ctx.setLineDash([24, 18]);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2 - 10, 40);
+      ctx.lineTo(canvas.width / 2 - 10, canvas.height * 0.65);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // --- Left Section Typography ---
+      ctx.fillStyle = '#1e3a8a';
+      ctx.font = 'bold 54px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('LEARNING', canvas.width * 0.25, 130);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('FEEL THE CORRECT PATTERN', canvas.width * 0.25, 180);
+
+      // Motor Number Labels
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
+      ctx.fillText('1', canvas.width * 0.17, 280);
+      ctx.fillText('2', canvas.width * 0.33, 280);
+      ctx.fillText('3', canvas.width * 0.17, 560);
+      ctx.fillText('4', canvas.width * 0.33, 560);
+      ctx.fillText('5', canvas.width * 0.17, 840);
+      ctx.fillText('6', canvas.width * 0.33, 840);
+
+      // --- Right Section Typography ---
+      ctx.fillStyle = '#1e3a8a';
+      ctx.font = 'bold 54px system-ui, -apple-system, sans-serif';
+      ctx.fillText('PRACTICE / TESTING', canvas.width * 0.75, 130);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('ENTER THE PATTERN', canvas.width * 0.75, 180);
+
+      // Button Number Labels
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
+      ctx.fillText('1', canvas.width * 0.65, 280);
+      ctx.fillText('4', canvas.width * 0.85, 280);
+      ctx.fillText('2', canvas.width * 0.65, 560);
+      ctx.fillText('5', canvas.width * 0.85, 560);
+      ctx.fillText('3', canvas.width * 0.65, 840);
+      ctx.fillText('6', canvas.width * 0.85, 840);
+
+      // SUBMIT Label above/under centered button
+      ctx.fillStyle = '#78350f';
+      ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+      ctx.fillText('SUBMIT', canvas.width * 0.75, 1260);
+
+      // --- BOTTOM CENTER SPEAKER GRILL ---
+      const spkX = canvas.width * 0.49;
+      const spkY = canvas.height * 0.84;
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.arc(spkX, spkY, 115, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      for (let r = 0; r <= 95; r += 19) {
+        const count = r === 0 ? 1 : Math.floor(2 * Math.PI * r / 19);
+        for (let i = 0; i < count; i++) {
+          const angle = (i * 2 * Math.PI) / count;
+          ctx.beginPath();
+          ctx.arc(spkX + r * Math.cos(angle), spkY + r * Math.sin(angle), 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('SPEAKER', spkX, spkY + 140);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = 16;
+      return texture;
+    }
+
+    function buildDevice() {
+      mainConsole = new THREE.Group();
+
+      // Main Enclosure Case Body
+      const topTexture = generateTopTexture();
+      const bodyMaterials = [
+        new THREE.MeshStandardMaterial({ color: 0xe5e1d8, roughness: 0.5 }), // right
+        new THREE.MeshStandardMaterial({ color: 0xe5e1d8, roughness: 0.5 }), // left
+        new THREE.MeshStandardMaterial({ map: topTexture, roughness: 0.4 }),  // top
+        new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.7 }), // bottom
+        new THREE.MeshStandardMaterial({ color: 0xe5e1d8, roughness: 0.5 }), // front
+        new THREE.MeshStandardMaterial({ color: 0xe5e1d8, roughness: 0.5 })  // back
+      ];
+
+      const caseGeo = new THREE.BoxGeometry(W, H, D, 10, 10, 10);
+      const caseMesh = new THREE.Mesh(caseGeo, bodyMaterials);
+      caseMesh.castShadow = true;
+      caseMesh.receiveShadow = true;
+      mainConsole.add(caseMesh);
+
+      // Beveled Border Rim
+      const rimGeo = new THREE.BoxGeometry(W + 2, 4, D + 2);
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0xd6d0c4, roughness: 0.4 });
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      rim.position.y = H / 2 - 2;
+      mainConsole.add(rim);
+
+      // ==================== 6 COIN VIBRATION MOTORS (LEFT SIDE) ====================
+      const motorLayout = [
+        { x: -68, z: -28, id: 1 }, { x: -34, z: -28, id: 2 },
+        { x: -68, z: 0,   id: 3 }, { x: -34, z: 0,   id: 4 },
+        { x: -68, z: 28,  id: 5 }, { x: -34, z: 28,  id: 6 }
+      ];
+
+      motorLayout.forEach(m => {
+        const mGroup = new THREE.Group();
+
+        // Metallic Rim
+        const rimMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(7, 7, 2, 32),
+          new THREE.MeshStandardMaterial({ color: 0xc0c5ce, metalness: 0.85, roughness: 0.25 })
+        );
+        rimMesh.position.y = H / 2 + 1;
+        rimMesh.castShadow = true;
+        mGroup.add(rimMesh);
+
+        // Black Motor Face
+        const faceMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(5.8, 5.8, 2.5, 32),
+          new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.3, roughness: 0.6 })
+        );
+        faceMesh.position.y = H / 2 + 1.6;
+        faceMesh.castShadow = true;
+        mGroup.add(faceMesh);
+
+        // Solder tab
+        const tab = new THREE.Mesh(
+          new THREE.BoxGeometry(3, 1.2, 2.5),
+          new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.3 })
+        );
+        tab.position.set(0, H / 2 + 1.2, 6.5);
+        mGroup.add(tab);
+
+        // Red & Blue Wires
+        const wireRed = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 6, 16),
+          new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 })
+        );
+        wireRed.rotation.x = Math.PI / 3;
+        wireRed.position.set(-1, H / 2 + 0.8, 9);
+        mGroup.add(wireRed);
+
+        const wireBlue = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 6, 16),
+          new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 })
+        );
+        wireBlue.rotation.x = Math.PI / 3;
+        wireBlue.position.set(1, H / 2 + 0.8, 9);
+        mGroup.add(wireBlue);
+
+        mGroup.position.set(m.x, 0, m.z);
+        mGroup.userData = { type: 'motor', id: m.id };
+        mainConsole.add(mGroup);
+        motors.push(mGroup);
+      });
+
+      // ==================== 6 PRACTICE BUTTONS (RIGHT SIDE) ====================
+      // Left Col White (x = 34), Right Col Red (x = 74)
+      const buttonLayout = [
+        { x: 34, z: -28, color: 0xffffff, rim: 0x475569, name: 'Button 1 (White)' },
+        { x: 74, z: -28, color: 0xdc2626, rim: 0x374151, name: 'Button 4 (Red)' },
+        { x: 34, z: 0,   color: 0xffffff, rim: 0x475569, name: 'Button 2 (White)' },
+        { x: 74, z: 0,   color: 0xdc2626, rim: 0x374151, name: 'Button 5 (Red)' },
+        { x: 34, z: 28,  color: 0xffffff, rim: 0x475569, name: 'Button 3 (White)' },
+        { x: 74, z: 28,  color: 0xdc2626, rim: 0x374151, name: 'Button 6 (Red)' }
+      ];
+
+      buttonLayout.forEach(b => {
+        const bGroup = new THREE.Group();
+
+        const bezel = new THREE.Mesh(
+          new THREE.CylinderGeometry(8.5, 9, 3, 32),
+          new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6, roughness: 0.3 })
+        );
+        bezel.position.y = H / 2 + 1.5;
+        bezel.castShadow = true;
+        bGroup.add(bezel);
+
+        const cap = new THREE.Mesh(
+          new THREE.CylinderGeometry(6.5, 6.8, 5, 32),
+          new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.25 })
+        );
+        cap.position.y = H / 2 + 3.8;
+        cap.castShadow = true;
+        bGroup.add(cap);
+
+        bGroup.position.set(b.x, 0, b.z);
+        bGroup.userData = { type: 'button', name: b.name, capMesh: cap, initialY: H / 2 + 3.8 };
+        mainConsole.add(bGroup);
+        interactiveButtons.push(bGroup);
+      });
+
+      // ==================== SUBMIT BUTTON (YELLOW - CENTERED BETWEEN WHITE & RED) ====================
+      // Center position: x = (34 + 74) / 2 = 54
+      const submitGroup = new THREE.Group();
+      const subBezel = new THREE.Mesh(
+        new THREE.CylinderGeometry(8.5, 9, 3, 32),
+        new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6, roughness: 0.3 })
+      );
+      subBezel.position.y = H / 2 + 1.5;
+      subBezel.castShadow = true;
+      submitGroup.add(subBezel);
+
+      const subCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(6.5, 6.8, 5, 32),
+        new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.25 })
+      );
+      subCap.position.y = H / 2 + 3.8;
+      subCap.castShadow = true;
+      submitGroup.add(subCap);
+
+      submitGroup.position.set(54, 0, 48); // Centered horizontally between columns
+      submitGroup.userData = { type: 'button', name: 'SUBMIT Button (Yellow - Centered)', capMesh: subCap, initialY: H / 2 + 3.8 };
+      mainConsole.add(submitGroup);
+      interactiveButtons.push(submitGroup);
+
+      scene.add(mainConsole);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.style.opacity = '1';
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => { toast.style.opacity = '0'; }, 1600);
+    }
+
+    function pressButton(bGroup) {
+      const cap = bGroup.userData.capMesh;
+      const initialY = bGroup.userData.initialY;
+      cap.position.y = initialY - 2.5;
+      showToast(`Pressed: ${bGroup.userData.name}`);
+
+      setTimeout(() => {
+        cap.position.y = initialY;
+      }, 150);
+    }
+
+    function triggerAllMotors() {
+      isVibrating = true;
+      showToast('⚡ Vibration Motors Active: Feeling Braille Pattern');
+      setTimeout(() => { isVibrating = false; }, 1800);
+    }
+
+    function onPointerDown(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(mainConsole.children, true);
+
+      if (intersects.length > 0) {
+        let current = intersects[0].object;
+        while (current && current.parent && current.parent !== mainConsole) {
+          current = current.parent;
+        }
+        if (current && current.userData) {
+          if (current.userData.type === 'button') {
+            pressButton(current);
+          } else if (current.userData.type === 'motor') {
+            triggerAllMotors();
+          }
+        }
+      }
+    }
+
+    function setCameraView(view) {
+      isAutoRotating = false;
+      document.getElementById('btn-rotate').innerText = '🔄 Resume Rotation';
+
+      if (view === 'top') {
+        camera.position.set(0, 320, 0.01);
+      } else if (view === 'iso') {
+        camera.position.set(160, 200, 200);
+      } else if (view === 'front') {
+        camera.position.set(0, 50, 300);
+      } else if (view === 'side') {
+        camera.position.set(300, 50, 0);
+      }
+      controls.target.set(0, 0, 0);
+    }
+
+    function toggleRotation() {
+      isAutoRotating = !isAutoRotating;
+      document.getElementById('btn-rotate').innerText = isAutoRotating ? '🔄 Pause Rotation' : '🔄 Resume Rotation';
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('canvas-container');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (isAutoRotating) {
+        mainConsole.rotation.y += 0.005;
+      }
+
+      if (isVibrating) {
+        motors.forEach(m => {
+          m.position.y = (Math.random() - 0.5) * 1.5;
+          m.position.x += (Math.random() - 0.5) * 0.6;
+        });
+      } else {
+        motors.forEach(m => {
+          m.position.y = 0;
+        });
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

@@ -35,7 +35,7 @@ several motors fire together, this is why.
 
 Never drive motors from the ESP32's 3V3 pin. Common ground everywhere.
 
-## Copying the headers
+## Generating the headers
 
 Sketches 3b and 6 and the main firmware need the generated headers, and each
 Arduino sketch folder needs its own copy. From the repo root:
@@ -51,3 +51,17 @@ cp firmware/braille_tutor/braille_map.h firmware/tests/t3b_braille_patterns/
 Re-run the copy after every `gen_braille_header.py` — the copies are snapshots,
 and a stale one means `t3b` buzzes a pattern the rest of the system no longer
 believes in.
+
+## Why t6 can fail even when the model is fine
+
+TFLite Micro's `FULLY_CONNECTED` kernel takes **one** requantization multiplier
+from `filter->params.scale` and applies it to every output channel. TFLite's
+converter defaults to **per-channel** weights — one scale per output unit.
+Nothing rejects that combination: TFLM loads the model, runs it, and quietly
+uses channel 0's scale for all channels. The softmax still sums to 1.0 and the
+output still looks like a probability distribution; it is just the wrong one.
+
+`tools/train.py` therefore disables per-channel quantization for the Dense
+layers, and asserts after conversion that no weight tensor carries more than one
+scale. If you ever see t6 report plausible-but-wrong classes while the desktop
+model is correct, check that first.

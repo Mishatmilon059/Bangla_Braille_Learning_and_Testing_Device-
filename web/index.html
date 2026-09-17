@@ -42,23 +42,6 @@
   }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
 
-  /* --- unverified-map banner ------------------------- */
-  #mapWarning {
-    display: none; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--warn);
-    color: #fde68a; padding: 14px 18px; border-radius: var(--radius);
-    margin-bottom: 20px; font-size: 0.92rem; backdrop-filter: blur(12px);
-  }
-  #mapWarning.show { display: block; }
-  #mapWarning b { color: var(--warn); }
-  #mapWarning.ok { background: rgba(16, 185, 129, 0.12); border-color: var(--ok); color: #a7f3d0; }
-  #mapWarning.ok b { color: var(--ok); }
-
-  .unverified-tag {
-    display: none; margin-top: 8px; font-size: 0.76rem; color: var(--warn);
-    background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warn);
-    border-radius: 999px; padding: 3px 12px; font-weight: 500;
-  }
-  .unverified-tag.show { display: inline-block; }
 
   header {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px;
@@ -164,6 +147,17 @@
   }
   .dot.correct { background: var(--ok); border-color: #34d399; color: #ffffff; box-shadow: 0 0 28px var(--ok-glow); }
   .dot.wrong   { background: var(--bad); border-color: #fb7185; color: #ffffff; box-shadow: 0 0 28px var(--bad-glow); }
+  .dot.hint {
+    background: #2563eb;
+    border-color: #93c5fd;
+    color: #ffffff;
+    box-shadow: 0 0 32px rgba(59, 130, 246, 0.95);
+    animation: hintPulse 1.2s infinite alternate ease-in-out;
+  }
+  @keyframes hintPulse {
+    0%   { transform: scale(1); box-shadow: 0 0 16px rgba(59, 130, 246, 0.6); border-color: #60a5fa; }
+    100% { transform: scale(1.12); box-shadow: 0 0 36px rgba(96, 165, 250, 1); border-color: #bfdbfe; }
+  }
 
   .keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 360px; }
   .key {
@@ -176,6 +170,16 @@
   .key .kb { display: block; font-size: 0.75rem; color: var(--accent); font-weight: 600; margin-top: 4px; }
   .key.active { background: var(--accent-grad); color: #ffffff; border-color: var(--accent); transform: translateY(1px); }
   .key.active .kb { color: #ffffff; }
+  .key.hint {
+    border-color: #60a5fa;
+    background: rgba(59, 130, 246, 0.22);
+    box-shadow: 0 0 18px rgba(59, 130, 246, 0.5);
+    animation: keyHintPulse 1.2s infinite alternate ease-in-out;
+  }
+  @keyframes keyHintPulse {
+    0%   { border-color: rgba(96, 165, 250, 0.6); box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+    100% { border-color: #93c5fd; box-shadow: 0 0 24px rgba(59, 130, 246, 0.7); }
+  }
 
   .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 
@@ -236,12 +240,10 @@
 <body>
 <div class="wrap">
 
-  <div id="mapWarning"></div>
-
   <header>
     <h1>বাংলা ব্রেইল</h1>
     <span class="sub">Bangla Braille Tutor — AI Data Collection</span>
-    <span class="grow"></span>
+    <a href="teacher.html" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#10b981; color:#ffffff; padding:6px 14px; border-radius:999px; font-size:0.85rem; font-weight:600; box-shadow:0 2px 10px rgba(16,185,129,0.3);">👩‍🏫 শিক্ষক প্যানেল</a>
     <span id="syncStatus">not started</span>
   </header>
 
@@ -292,9 +294,6 @@
       <div class="left">
         <div class="prompt-char" id="promptChar">?</div>
         <div class="prompt-name" id="promptName">listen to the prompt</div>
-        <div style="text-align:center">
-          <span class="unverified-tag" id="unverifiedTag">⚠ placeholder pattern</span>
-        </div>
         <div class="cell" id="cell">
           <div class="dot" data-dot="1">1</div><div class="dot" data-dot="4">4</div>
           <div class="dot" data-dot="2">2</div><div class="dot" data-dot="5">5</div>

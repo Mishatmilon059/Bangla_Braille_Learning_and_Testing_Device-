@@ -196,12 +196,15 @@ sd_card/mp3/  →  copy to the microSD card root (DFPlayer needs a folder named 
 
 ## What this model actually is — read before writing it up
 
-The labels come from the rule engine. A 1,161-parameter network trained on them
-learns to **compress your if/else logic**, reaching ~96–97% agreement. It does
-not discover teaching policy.
+The labels come from the rule engine. A 790-parameter network trained on them
+learns to **compress your if/else logic**, reaching ~100% agreement on
+synthetic data. It does not discover teaching policy. Only 4 of the 14 logged
+features (`response_time`, `press_duration`, `retry_count`, `wrong_streak`)
+are actually fed to the model — the rest are kept in the database for
+analysis but read by no rule, so the model has nothing to gain from them.
 
 That is a legitimate TinyML result — train → quantize → deploy → real-time
-offline inference at ~5.8 KB — and it should be written up that way. Describing
+offline inference at ~5.5 KB — and it should be written up that way. Describing
 it as autonomous adaptive learning would be false, and any examiner who asks
 "where did the labels come from?" will find that out in one question.
 
@@ -213,15 +216,21 @@ The genuinely interesting material is `models/disagreements.csv`: the held-out
 ## Hardware
 
 ESP32-WROOM-32 · DFPlayer Mini + 3 W speaker · **ULN2803A** · 6 coin motors ·
-6 tactile buttons · microSD module · 5 V 2 A supply · 1000 µF cap · 6× 1 kΩ ·
-2× 10 kΩ · *(recommended)* DS3231 RTC
+6 tactile dot buttons + 1 submit button · microSD module · 5 V 2 A supply ·
+1000 µF cap · 6× 1 kΩ · 3× 10 kΩ · *(recommended)* DS3231 RTC
 
 | Function | GPIO |
 |---|---|
-| Buttons 1–6 | 32, 33, 25, 26, 27, 14 |
+| Buttons 1–6 (dots) | 32, 33, 25, 26, 27, 14 |
+| Submit | 34 *(input-only — needs an external 10 kΩ pull-up to 3V3)* |
 | Motors 1–6 → ULN2803A | 13, 4, 21, 22, 2, 15 |
 | DFPlayer (UART2) | 16 RX, 17 TX |
 | microSD (VSPI) | 18 CLK, 19 MISO, 23 MOSI, 5 CS |
+
+`response_time` is measured from the end of the prompt audio to the debounced
+**submit** press, not to the first dot press — the learner is expected to hold
+the pattern on the 6 dot buttons, then press submit. `web/app.js` measures the
+same way (prompt end → the submit click), so the two stay comparable.
 
 Three things that will bite you, in order of likelihood:
 
@@ -235,7 +244,7 @@ Three things that will bite you, in order of likelihood:
 3. **GPIO 2 and 15 are strapping pins** — add 10 kΩ pulldowns. GPIO 12 is
    deliberately unused; it must be LOW at boot.
 
-**Fit:** model 5,928 B + 8 KB arena ≈ **13.8 KB of 520 KB SRAM**. Size was never
+**Fit:** model 5,480 B + 8 KB arena ≈ **13.4 KB of 520 KB SRAM**. Size was never
 the risk on this project.
 
 ### The RTC, and why it matters
@@ -266,6 +275,15 @@ python3 tools/run_all_tests.py
 `test_web_e2e.mjs` is the one that earns its keep: it catches a session that
 looks fine but logs null or NaN features — otherwise discovered weeks later
 with the data already collected and the volunteers gone.
+
+---
+
+## Full report
+
+`docs/PROJECT_REPORT.md` — end-to-end write-up: architecture, the 14 features
+and why correctness is derivable from the streaks, measured results, hardware
+design, every known limitation, and what can and cannot honestly be claimed
+today. Every figure in it is checked against the source data.
 
 ---
 

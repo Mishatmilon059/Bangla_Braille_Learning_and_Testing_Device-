@@ -1,24 +1,50 @@
 {
-  "params": 1161,
+  "note": "sklearn MLP (architecture matches TFLite model), not TFLite quantized",
+  "model_architecture": "Input(4) -> Dense(32,relu) -> Dense(16,relu) -> [Dense(3,softmax) x2] (two heads)",
+  "trainable_params_approx": 790,
+  "features": [
+    "response_time",
+    "press_duration",
+    "retry_count",
+    "wrong_streak"
+  ],
   "rows": {
-    "real": 0,
-    "synthetic": 600
+    "real": 743,
+    "synthetic": 1200,
+    "total": 1943
   },
-  "test": {
-    "teaching_combined": 0.967032967032967,
-    "teaching_real_only": NaN,
-    "teaching_majority_baseline": 0.37362637362637363,
-    "confidence_combined": 0.8791208791208791,
-    "confidence_real_only": NaN,
-    "confidence_majority_baseline": 0.5274725274725275
+  "data_quality": {
+    "participants": 3,
+    "sessions": 36,
+    "distinct_days": 1,
+    "spec_version": "2 only",
+    "braille_map_verified_rows": 152
   },
-  "rule_agreement": 0.967032967032967,
-  "disagreements": {
-    "total": 3,
-    "real": 0
+  "split": {
+    "train": 1360,
+    "val": 291,
+    "test": 292,
+    "real_in_test": 114
   },
-  "tflite_bytes": 5928,
-  "tflite_vs_keras_teaching": 1.0,
-  "spec_version": 1,
-  "trained_on_real_data": false
+  "test_accuracy": {
+    "teaching_combined": 0.5171,
+    "teaching_real_only": 0.7544,
+    "teaching_majority_baseline": 0.5137,
+    "confidence_combined": 0.8151,
+    "confidence_real_only": 0.7632,
+    "confidence_majority_baseline": 0.5137
+  },
+  "rule_engine_agreement": 0.5171,
+  "class_distribution": {
+    "teaching_action": {
+      "REPEAT": 523,
+      "HINT": 425,
+      "NORMAL_PRACTICE": 995
+    },
+    "confidence_state": {
+      "CONFIDENT": 216,
+      "HESITANT": 1003,
+      "GUESSING": 724
+    }
+  }
 }

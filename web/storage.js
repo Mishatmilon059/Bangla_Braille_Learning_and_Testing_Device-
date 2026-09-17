@@ -5,7 +5,7 @@
 // pushed to Supabase. Failed pushes stay queued and retry later.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY, DEVICE_ID_KEY } from './config.js';
-import { FEATURE_RANGES, MASTERY_INITIAL, updateMastery } from './rule_engine.js';
+import { ALL_FEATURE_RANGES, MASTERY_INITIAL, updateMastery } from './rule_engine.js';
 
 const QUEUE_KEY = 'braille.queue';
 const ROWS_KEY = 'braille.rows';
@@ -14,7 +14,7 @@ const STATE_PREFIX = 'braille.state.';
 // Column order for CSV export and for the Supabase payload.
 export const CSV_COLUMNS = [
   'created_at', 'user_id', 'session_id', 'device_id', 'attempt_index',
-  ...FEATURE_RANGES.map((r) => r.name),
+  ...ALL_FEATURE_RANGES.map((r) => r.name),
   'teaching_action', 'confidence_state',
   'expected_pattern', 'entered_pattern', 'is_correct', 'press_order',
   'source', 'is_synthetic', 'spec_version', 'braille_map_verified',
@@ -94,7 +94,7 @@ export class LearnerState {
   timeSinceLastPractice(id, nowMs) {
     const c = this.char(id);
     if (c.lastPracticeMs == null) {
-      return FEATURE_RANGES.find((r) => r.name === 'time_since_last_practice').max;
+      return ALL_FEATURE_RANGES.find((r) => r.name === 'time_since_last_practice').max;
     }
     return Math.max(0, (nowMs - c.lastPracticeMs) / 1000);
   }
@@ -193,6 +193,7 @@ export class AttemptLogger {
     this.queue = readJSON(QUEUE_KEY, []);
     this.rows = readJSON(ROWS_KEY, []);
     this.flushing = false;
+    this._retryTimer = null;
     this.configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
     addEventListener('online', () => this.flush());
   }
@@ -223,7 +224,13 @@ export class AttemptLogger {
     this.flushing = true;
     try {
       // Send as one batch; Supabase accepts an array insert.
-      const batch = this.queue.slice(0, 100);
+      // Sanitize streak fields: the DB enforces current_streak=0 OR wrong_streak=0.
+      // Old rows in the queue may violate this; use is_correct as the truth source.
+      const batch = this.queue.slice(0, 100).map((r) => {
+        if (r.is_correct && r.wrong_streak > 0) return { ...r, wrong_streak: 0 };
+        if (!r.is_correct && r.current_streak > 0) return { ...r, current_streak: 0 };
+        return r;
+      });
       const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts`, {
         method: 'POST',
         headers: {
@@ -250,12 +257,29 @@ export class AttemptLogger {
       const body = await res.text();
       this.onStatus('error', `sync failed ${res.status} — ${this.queue.length} queued`);
       console.error('Supabase insert failed', res.status, body);
+      this._scheduleRetry();
     } catch (err) {
       this.onStatus('error', `offline — ${this.queue.length} queued`);
       console.error('Supabase insert threw', err);
+      this._scheduleRetry();
     } finally {
       this.flushing = false;
     }
+  }
+
+  _scheduleRetry(delayMs = 30000) {
+    if (this._retryTimer) return;
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = null;
+      this.flush();
+    }, delayMs);
+  }
+
+  /** Force an immediate retry of any queued rows. */
+  retryNow() {
+    clearTimeout(this._retryTimer);
+    this._retryTimer = null;
+    this.flush();
   }
 
   async syncRemoteForUser(userId, learner) {

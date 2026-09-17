@@ -143,6 +143,8 @@
     "char": "খ",
     "name": "kha",
     "dots": [
+      1,
+      3,
       4,
       6
     ],
@@ -225,6 +227,7 @@
     "char": "ঝ",
     "name": "jha",
     "dots": [
+      1,
       3,
       5,
       6
@@ -393,9 +396,9 @@
     "char": "ফ",
     "name": "pha",
     "dots": [
-      1,
       2,
-      4
+      3,
+      5
     ],
     "svg": "32_pha.svg",
     "png": "32_pha.png"
@@ -416,8 +419,10 @@
     "char": "ভ",
     "name": "bha",
     "dots": [
-      4,
-      5
+      1,
+      2,
+      3,
+      6
     ],
     "svg": "34_bha.svg",
     "png": "34_bha.png"
@@ -557,8 +562,6 @@
     "name": "yya",
     "dots": [
       2,
-      3,
-      5,
       6
     ],
     "svg": "45_yya.svg",
@@ -571,7 +574,8 @@
     "dots": [
       2,
       3,
-      6
+      4,
+      5
     ],
     "svg": "46_khanda_ta.svg",
     "png": "46_khanda_ta.png"
@@ -592,8 +596,7 @@
     "char": "ঃ",
     "name": "bisharga",
     "dots": [
-      2,
-      3
+      6
     ],
     "svg": "48_bisharga.svg",
     "png": "48_bisharga.png"
@@ -603,7 +606,7 @@
     "char": "ঁ",
     "name": "chandrabindu",
     "dots": [
-      4
+      3
     ],
     "svg": "49_chandrabindu.svg",
     "png": "49_chandrabindu.png"

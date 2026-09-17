@@ -13,6 +13,7 @@ import {
 } from './rule_engine.js';
 import { BrailleCell, KeyPad, dotsToMask, maskToDots } from './braille_cell.js';
 import { LearnerState, AttemptLogger, deviceId, uuid } from './storage.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 import { FALLBACK_MAP } from './braille_map_fallback.js';
 
@@ -26,7 +27,7 @@ const COMBINING = new Set(['ঁ', 'ং', 'ঃ']);
 const displayChar = (ch) => (COMBINING.has(ch) ? '◌' + ch : ch);
 
 const ui = {
-  mapWarning: $('mapWarning'), syncStatus: $('syncStatus'),
+  syncStatus: $('syncStatus'),
   setup: $('setup'), practice: $('practice'),
   userId: $('userId'), mode: $('mode'), setLen: $('setLen'), charSet: $('charSet'),
   startBtn: $('startBtn'), exportBtn: $('exportBtn'), flushBtn: $('flushBtn'),
@@ -35,7 +36,7 @@ const ui = {
   promptChar: $('promptChar'), promptName: $('promptName'),
   replayBtn: $('replayBtn'), submitBtn: $('submitBtn'), clearBtn: $('clearBtn'),
   hintBtn: $('hintBtn'), stopBtn: $('stopBtn'),
-  hintBox: $('hintBox'), feedback: $('feedback'), unverifiedTag: $('unverifiedTag'),
+  hintBox: $('hintBox'), feedback: $('feedback'),
   stRows: $('stRows'), stAcc: $('stAcc'), stSess: $('stSess'), stDays: $('stDays'),
   stChars: $('stChars'), stQueue: $('stQueue'),
   taTable: $('taTable'), csTable: $('csTable'), charTable: $('charTable'),
@@ -48,7 +49,7 @@ const MODE_NOTES = {
 };
 
 const state = {
-  letters: [], mapVerified: false, active: [],
+  letters: [], active: [],
   learner: null, logger: null, cell: null, pad: null,
   audio: new Map(),
   session: null, current: null, running: false,
@@ -70,8 +71,6 @@ async function boot() {
   }
   if (!map) map = FALLBACK_MAP;
   state.letters = map.letters;
-  state.mapVerified = Boolean(map.verified);
-  renderMapBanner(map);
 
   state.cell = new BrailleCell($('cell'));
   state.pad = new KeyPad(document.querySelector('.keys'), {
@@ -82,7 +81,14 @@ async function boot() {
     ui.syncStatus.className = kind === 'ok' ? 'ok' : kind === 'error' ? 'error'
       : kind === 'pending' ? 'pending' : '';
     ui.syncStatus.textContent = msg;
+    ui.syncStatus.title = kind === 'error' ? 'Click to retry' : '';
+    ui.syncStatus.style.cursor = kind === 'error' ? 'pointer' : '';
   });
+  ui.syncStatus.addEventListener('click', () => {
+    if (state.logger) state.logger.retryNow();
+  });
+
+  checkSupabase();
 
   ui.userId.value = localStorage.getItem('braille.lastUser') || 'P01';
   ui.setLen.value = SESSION_TARGET_ATTEMPTS;
@@ -92,34 +98,27 @@ async function boot() {
   renderAll();
 }
 
-/**
- * Verification is per letter, because images arrive in batches. A blanket
- * "everything is unverified" banner would stay up for weeks while genuinely
- * verified characters were already usable, and would train everyone to ignore it.
- */
-function renderMapBanner(map) {
-  const total = map.letters.length;
-  const n = map.letters.filter((l) => l.verified).length;
-  const el = ui.mapWarning;
-  el.classList.add('show');
-
-  if (n === total) {
-    el.classList.add('ok');
-    el.innerHTML = `<b>✓ Braille mapping verified.</b> All ${total} letters were read from
-      supplied reference images. Safe to use with real learners.`;
+async function checkSupabase() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    ui.syncStatus.className = '';
+    ui.syncStatus.textContent = 'offline (no Supabase config)';
     return;
   }
-  el.classList.remove('ok');
-  const missing = map.letters.filter((l) => !l.verified);
-  const vowels = missing.filter((l) => l.category === 'vowel').length;
-  el.innerHTML = `<b>⚠ Braille mapping verified for ${n} of ${total} letters.</b>
-    The remaining ${total - n} (${vowels} vowel, ${missing.length - vowels} consonant)
-    still carry <b>Bharati placeholder</b> patterns not checked against the Bangladesh
-    National Braille code. Practising a placeholder character is marked on the prompt,
-    and every logged row records whether <i>that character</i> was verified — so
-    verified rows stay usable while the rest of the alphabet is confirmed.
-    Add images to <span class="mono">braille_img/</span> and run
-    <span class="mono">tools/import_braille_images.py</span>.`;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts?limit=0`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    });
+    if (res.ok || res.status === 406) {
+      ui.syncStatus.className = 'ok';
+      ui.syncStatus.textContent = 'Supabase connected';
+    } else {
+      ui.syncStatus.className = 'error';
+      ui.syncStatus.textContent = `Supabase error ${res.status}`;
+    }
+  } catch {
+    ui.syncStatus.className = 'error';
+    ui.syncStatus.textContent = 'Supabase unreachable';
+  }
 }
 
 async function loadLearner() {
@@ -252,11 +251,6 @@ function pickLetter(prevAction, prevLetter) {
   if (prevAction === TEACHING_ACTION.REPEAT || prevAction === TEACHING_ACTION.HINT) {
     return prevLetter;
   }
-  if (prevAction === TEACHING_ACTION.REVIEW_PREVIOUS && seen.length) {
-    const weak = seen.filter((l) => state.learner.char(l.id).mastery < 0.6);
-    const pool = weak.length ? weak : seen;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
 
   if (state.session.mode === 'review') {
     const weak = seen.filter((l) => state.learner.char(l.id).mastery < 0.5);
@@ -304,12 +298,12 @@ function nextPrompt(prevAction = null, prevLetter = null) {
 
   state.cell.clear();
   state.pad.reset();
+  if (state.pad.clearHint) state.pad.clearHint();
   ui.hintBox.classList.remove('show');
   ui.feedback.classList.remove('show');
   ui.promptChar.textContent = displayChar(letter.char);
   ui.promptChar.classList.remove('prompt-hidden');
   ui.promptName.textContent = `${letter.name} — enter the dots you hear`;
-  ui.unverifiedTag.classList.toggle('show', !letter.verified);
   ui.attemptNo.textContent = state.session.attemptIndex + 1;
   ui.diffLevel.textContent = state.learner.data.difficulty;
   playPrompt(true);
@@ -318,13 +312,35 @@ function nextPrompt(prevAction = null, prevLetter = null) {
 function clearEntry() {
   state.pad.reset();
   state.cell.clear();
+  if (state.current && state.current.hints > 0) {
+    const dots = state.current.letter.dots || [];
+    state.cell.showHint(dots);
+    if (state.pad.showHint) state.pad.showHint(dots);
+  }
 }
 
 function useHint() {
   if (!state.running || !state.current) return;
   state.current.hints += 1;
-  const dots = state.current.letter.dots;
-  ui.hintBox.textContent = `Hint: ${dots.length} dot${dots.length > 1 ? 's' : ''} — ${dots.join(', ')}`;
+  const letter = state.current.letter;
+  const dots = letter.dots || [];
+
+  // Visually illuminate the correct Braille dots on the 6-dot cell and the keypad
+  state.cell.showHint(dots);
+  if (state.pad && state.pad.showHint) {
+    state.pad.showHint(dots);
+  }
+
+  if (letter.cells && letter.cells.length === 2) {
+    const [pre, main] = letter.cells;
+    ui.hintBox.innerHTML =
+      `<b>💡 ইঙ্গিত (Hint):</b> ২-সেল ব্রেইল — প্রথমে প্রিফিক্স ডট <b>${pre.join(',')}</b> (ডিভাইস ভাইব্রেট করবে), এরপর সঠিক ডট: ` +
+      main.map(d => `<span class="pill ok" style="font-weight:700">ডট ${d}</span>`).join(' ');
+  } else {
+    ui.hintBox.innerHTML =
+      `<b>💡 ইঙ্গিত (Hint):</b> সঠিক ডট হলো — ` +
+      dots.map(d => `<span class="pill ok" style="font-weight:700">ডট ${d}</span>`).join(' ');
+  }
   ui.hintBox.classList.add('show');
   playCue(54);
 }
@@ -358,10 +374,11 @@ function submit() {
   };
 
   // current-attempt measurements
+  // response_time: prompt end -> the submit click itself, not the first key
+  // press -- `now` was captured at the top of submit(). Must match
+  // response_time in braille_tutor.ino (prompt end -> PIN_SUBMIT press).
   const promptEnd = cur.promptEndMs === null ? now : cur.promptEndMs;
-  const responseTime = state.pad.firstPressMs === null
-    ? now - promptEnd
-    : Math.max(0, state.pad.firstPressMs - promptEnd);
+  const responseTime = Math.max(0, now - promptEnd);
 
   // post-attempt: update history, THEN read the streaks
   const confidencePlaceholder = c.lastConfidence;
@@ -392,8 +409,6 @@ function submit() {
   // store the confidence we actually computed, for the next attempt's feature 11
   after.lastConfidence = confidence;
   state.learner.save();
-
-  applyDifficulty(action);
 
   state.logger.log({
     created_at: new Date().toISOString(),
@@ -429,9 +444,9 @@ function submit() {
     if (!state.running) return;
     if (state.session.attemptIndex >= state.session.total) return endSession('complete');
     if (retryThisPrompt) {
-      if (action === TEACHING_ACTION.HINT) useHint();
       state.pad.reset();
       state.cell.clear();
+      if (action === TEACHING_ACTION.HINT) useHint();
       cur.promptEndMs = performance.now();
       ui.attemptNo.textContent = state.session.attemptIndex + 1;
       ui.feedback.classList.remove('show');
@@ -439,13 +454,6 @@ function submit() {
       nextPrompt(action, letter);
     }
   }, correct ? 1100 : 1800);
-}
-
-function applyDifficulty(action) {
-  const d = state.learner.data;
-  if (action === TEACHING_ACTION.INCREASE_DIFFICULTY) d.difficulty = Math.min(5, d.difficulty + 1);
-  else if (action === TEACHING_ACTION.REVIEW_PREVIOUS) d.difficulty = Math.max(1, d.difficulty - 1);
-  state.learner.save();
 }
 
 function showFeedback(correct, action, confidence, expectedMask, enteredMask) {
