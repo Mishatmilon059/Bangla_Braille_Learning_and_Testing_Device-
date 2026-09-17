@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import rule_engine_gen as engine  # noqa: E402
+import tflite_heads  # noqa: E402
 
 TFLITE = ROOT / "models" / "model.tflite"
 GOLDEN = ROOT / "models" / "golden_vectors.json"
@@ -34,25 +35,37 @@ def main():
 
     blob = TFLITE.read_bytes()
 
-    # read quantization straight from the model rather than trusting a note
-    import tensorflow as tf
-    interp = tf.lite.Interpreter(model_content=blob)
+    # read quantization straight from the model rather than trusting a note.
+    # LiteRT first: it is the standalone runtime, so regenerating the header
+    # does not drag in a full TensorFlow install.
+    try:
+        from ai_edge_litert.interpreter import Interpreter
+    except ImportError:
+        from tensorflow.lite import Interpreter
+    interp = Interpreter(model_content=blob)
     interp.allocate_tensors()
     inp = interp.get_input_details()[0]
     outs = interp.get_output_details()
     in_scale, in_zp = inp["quantization"]
 
-    heads = {}
-    for d in outs:
-        n = int(d["shape"][-1])
-        s, z = d["quantization"]
-        heads[n] = (s, z, int(d["index"]))
     n_cs = len(engine.CONFIDENCE_STATE_NAMES)
     n_ta = len(engine.TEACHING_ACTION_NAMES)
-    if n_cs not in heads or n_ta not in heads:
-        sys.exit(f"model outputs {sorted(heads)} do not match heads {n_cs}/{n_ta}")
+    heads = tflite_heads.resolve_heads(interp, n_cs, n_ta)
+    conf, teach = heads["confidence"], heads["teaching"]
 
     golden = json.loads(GOLDEN.read_text(encoding="utf-8")) if GOLDEN.exists() else {"vectors": []}
+    # If train.py recorded the mapping it validated, that wins -- the golden
+    # vectors below were labelled under it, so disagreeing here would make the
+    # on-device self-test compare the right numbers against the wrong head.
+    recorded = golden.get("heads")
+    if recorded:
+        for name, info in (("confidence", conf), ("teaching", teach)):
+            if int(recorded[name]["output_pos"]) != info["output_pos"]:
+                sys.exit(
+                    f"{name} head resolves to output {info['output_pos']} but "
+                    f"train.py recorded output {recorded[name]['output_pos']}. "
+                    "models/golden_vectors.json is stale -- re-run tools/train.py.")
+
     metrics = json.loads(METRICS.read_text(encoding="utf-8")) if METRICS.exists() else {}
     vectors = golden.get("vectors", [])[:12]
 
@@ -94,13 +107,22 @@ alignas(16) static const unsigned char MODEL_DATA[MODEL_DATA_LEN] = {{
 // The firmware quantizes with:  q = round(x / scale) + zero_point
 #define MODEL_INPUT_SCALE       {in_scale:.10f}f
 #define MODEL_INPUT_ZERO_POINT  {int(in_zp)}
-#define MODEL_CONF_SCALE        {heads[n_cs][0]:.10f}f
-#define MODEL_CONF_ZERO_POINT   {int(heads[n_cs][1])}
-#define MODEL_TEACH_SCALE       {heads[n_ta][0]:.10f}f
-#define MODEL_TEACH_ZERO_POINT  {int(heads[n_ta][1])}
+#define MODEL_CONF_SCALE        {conf['scale']:.10f}f
+#define MODEL_CONF_ZERO_POINT   {conf['zero_point']}
+#define MODEL_TEACH_SCALE       {teach['scale']:.10f}f
+#define MODEL_TEACH_ZERO_POINT  {teach['zero_point']}
 
 #define MODEL_CONF_CLASSES  {n_cs}
 #define MODEL_TEACH_CLASSES {n_ta}
+
+// Which interpreter->output(i) is which head, read out of the model's signature
+// at generation time. Do NOT match heads by class count in the firmware: both
+// heads are {n_cs} wide, so a size test matches the same tensor twice and leaves
+// the other head pointer null. The converter also does not preserve the order
+// the Keras model declared its outputs in, so position is only trustworthy
+// because it was resolved from this exact flatbuffer.
+#define MODEL_CONF_OUTPUT_INDEX  {conf['output_pos']}
+#define MODEL_TEACH_OUTPUT_INDEX {teach['output_pos']}
 
 // Tensor arena. The model is ~{len(blob) // 1024} KB with two small dense layers, so this is
 // generous; the sketch prints the actually-used size at boot so you can shrink it.
@@ -128,6 +150,8 @@ static const GoldenVector GOLDEN_VECTORS[] = {{
     print(f"wrote {OUT.relative_to(ROOT)}")
     print(f"  model bytes    : {len(blob)} ({len(blob) / 1024:.1f} KB)")
     print(f"  input quant    : scale {in_scale:.8f}  zero_point {int(in_zp)}")
+    print(f"  heads          : teaching -> output({teach['output_pos']}), "
+          f"confidence -> output({conf['output_pos']})")
     print(f"  golden vectors : {len(vectors)}")
     if trained_real is False:
         print("\n  !! model trained on synthetic data only -- not a real-learner model")

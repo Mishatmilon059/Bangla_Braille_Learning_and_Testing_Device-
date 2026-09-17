@@ -42,23 +42,6 @@
   }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
 
-  /* --- unverified-map banner ------------------------- */
-  #mapWarning {
-    display: none; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--warn);
-    color: #fde68a; padding: 14px 18px; border-radius: var(--radius);
-    margin-bottom: 20px; font-size: 0.92rem; backdrop-filter: blur(12px);
-  }
-  #mapWarning.show { display: block; }
-  #mapWarning b { color: var(--warn); }
-  #mapWarning.ok { background: rgba(16, 185, 129, 0.12); border-color: var(--ok); color: #a7f3d0; }
-  #mapWarning.ok b { color: var(--ok); }
-
-  .unverified-tag {
-    display: none; margin-top: 8px; font-size: 0.76rem; color: var(--warn);
-    background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warn);
-    border-radius: 999px; padding: 3px 12px; font-weight: 500;
-  }
-  .unverified-tag.show { display: inline-block; }
 
   header {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px;
@@ -236,8 +219,6 @@
 <body>
 <div class="wrap">
 
-  <div id="mapWarning"></div>
-
   <header>
     <h1>বাংলা ব্রেইল</h1>
     <span class="sub">Bangla Braille Tutor — AI Data Collection</span>
@@ -292,9 +273,6 @@
       <div class="left">
         <div class="prompt-char" id="promptChar">?</div>
         <div class="prompt-name" id="promptName">listen to the prompt</div>
-        <div style="text-align:center">
-          <span class="unverified-tag" id="unverifiedTag">⚠ placeholder pattern</span>
-        </div>
         <div class="cell" id="cell">
           <div class="dot" data-dot="1">1</div><div class="dot" data-dot="4">4</div>
           <div class="dot" data-dot="2">2</div><div class="dot" data-dot="5">5</div>
