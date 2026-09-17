@@ -1,11 +1,11 @@
 {
   "_comment": "SINGLE SOURCE OF TRUTH for Bangla Braille character mappings.",
   "_standard": "Bangladesh National Braille Code",
-  "_warning": "2 of 50 letters still unresolved. ঋ (id=6) verified from braille_img but has a two-cell collision with র; ৎ (id=46) requires a two-cell Bangladesh pattern ([5]+[2,3,4,5]) that cannot be represented as a single 6-dot cell without colliding with ত — left as an approximation pending hardware/UX decision.",
+  "_warning": "All 50 letters are encoded. ঋ (id=6) and ৎ (id=46) are two-cell characters (prefix dot-5 then the main cell). The device vibrates cell 1, pauses, then collects the learner's answer for cell 2 only. ঋ still collides with র on cell-2 alone — see _notes.collision_ri_ra.",
   "_notes": {
-    "verification_sources": "11 vowels verified from braille_img/; 38 consonants+modifiers verified from Wikipedia:Bengali_Braille (Bangladesh standard, retrieved 2026-09-17).",
-    "collision_ri_ra": "ঋ (id=6) and র (id=37) share the same single-cell pattern [1,2,3,5]. In Bangladesh Braille, ঋ is encoded as two cells: prefix dot-5 then dots-1235. The tutor uses only the second cell, making ঋ and র indistinguishable in practice. A hardware-side fix (dedicated prefix key) or removal of ঋ from the learnable set should be considered.",
-    "twocell_khanda_ta": "ৎ (id=46) in Bangladesh Braille is two cells: [5] then [2,3,4,5]. The second cell [2,3,4,5] collides with ত [2,3,4,5]. Current single-cell approximation [2,3,6] is wrong but avoids the collision. Proper support requires a multi-cell input mechanism.",
+    "verification_sources": "11 vowels verified from braille_img/; 38 consonants+modifiers verified from Wikipedia:Bengali_Braille (Bangladesh standard, retrieved 2026-09-17). ঋ and ৎ additionally confirmed as two-cell from Bangladesh standard.",
+    "two_cell_encoding": "Characters with a 'cells' field are multi-cell. cells[0] is the prefix (vibrated first on the device, displayed as context in the web app). cells[1] / 'dots' is the answer cell that the learner presses. Scoring always uses 'dots' (cells[-1]).",
+    "collision_ri_ra": "ঋ (id=6) and র (id=37) share the same second-cell pattern [1,2,3,5]. With the two-cell prompt the prefix dot-5 distinguishes them during the teaching phase. The learner still only presses [1,2,3,5] for both — ambiguity remains at input time but is resolved by context (the audio names the character). Consider a two-button submit protocol in a future hardware revision.",
     "not_in_map": "ঌ (obsolete vowel) is not attested in Bangladesh Braille and is excluded from the map. ক্ষ (dots 1,2,3,4,5) and জ্ঞ (dots 1,5,6) are present in Bangladesh standard but not in the 50-character learnable set."
   },
   "standard": "Bangladesh_National_Braille_Code",
@@ -93,10 +93,11 @@
       "roman": "ri",
       "category": "vowel",
       "dots": [1, 2, 3, 5],
+      "cells": [[5], [1, 2, 3, 5]],
       "audio": "0007.mp3",
       "verified": true,
-      "source": "braille_img/ri.webp",
-      "_note": "Bangladesh standard encodes ঋ as two cells: [5]+[1,2,3,5]. This single-cell value is the second cell only, and collides with র (id=37). See _notes.collision_ri_ra."
+      "source": "braille_img/ri.webp + Wikipedia:Bengali_Braille",
+      "_note": "Two-cell: device vibrates prefix [5] then the learner presses [1,2,3,5]. Collides with র (id=37) on the second cell — distinguished by the prefix vibration and audio. See _notes.collision_ri_ra."
     },
     {
       "id": 7,
@@ -534,10 +535,12 @@
       "name": "khanda_ta",
       "roman": "t",
       "category": "consonant",
-      "dots": [2, 3, 6],
+      "dots": [2, 3, 4, 5],
+      "cells": [[5], [2, 3, 4, 5]],
       "audio": "0047.mp3",
-      "verified": false,
-      "_note": "Bangladesh standard: two cells [5]+[2,3,4,5]. The second cell [2,3,4,5] collides with ত (id=26). Current dots [2,3,6] are a placeholder — see _notes.twocell_khanda_ta for resolution options."
+      "verified": true,
+      "source": "Wikipedia:Bengali_Braille",
+      "_note": "Two-cell: device vibrates prefix [5] then the learner presses [2,3,4,5]. Second cell collides with ত (id=26) — distinguished by the prefix vibration and audio."
     },
     {
       "id": 47,
@@ -573,5 +576,5 @@
       "source": "Wikipedia:Bengali_Braille"
     }
   ],
-  "verified_count": 49
+  "verified_count": 50
 }

@@ -309,8 +309,15 @@ function clearEntry() {
 function useHint() {
   if (!state.running || !state.current) return;
   state.current.hints += 1;
-  const dots = state.current.letter.dots;
-  ui.hintBox.textContent = `Hint: ${dots.length} dot${dots.length > 1 ? 's' : ''} — ${dots.join(', ')}`;
+  const letter = state.current.letter;
+  const dots = letter.dots;
+  if (letter.cells && letter.cells.length === 2) {
+    const [pre, main] = letter.cells;
+    ui.hintBox.textContent =
+      `Hint: 2-cell — prefix dot ${pre.join(',')} (device vibrates first), then enter dots ${main.join(', ')}`;
+  } else {
+    ui.hintBox.textContent = `Hint: ${dots.length} dot${dots.length > 1 ? 's' : ''} — ${dots.join(', ')}`;
+  }
   ui.hintBox.classList.add('show');
   playCue(54);
 }

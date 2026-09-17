@@ -224,12 +224,19 @@ static void log_attempt(uint8_t id, const Features *f, uint8_t action, uint8_t c
 static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   CharState *c = char_state(id);
   uint8_t expected = BRAILLE_PATTERN[id];
+  uint8_t prefix   = BRAILLE_PREFIX[id];
 
   // --- prompt ---------------------------------------------------------
   buttons_reset_attempt();
   submit_reset_attempt();
   audio_play_blocking(braille_track(id));
-  uint32_t prompt_end_ms = millis();   // clock starts when the prompt ENDS
+  // Two-cell characters: vibrate the prefix cell so the learner knows the
+  // character requires a prefix, then pause before they enter the answer cell.
+  if (prefix) {
+    motors_show_pattern(prefix, 350);
+    delay(600);
+  }
+  uint32_t prompt_end_ms = millis();   // clock starts when the full prompt ENDS
 
   // --- collect the answer ---------------------------------------------
   // The learner holds the dot pattern, then presses the dedicated submit
@@ -299,10 +306,12 @@ static uint8_t run_attempt(uint8_t id, int tries, int hints) {
   } else {
     audio_play_blocking(52);            // "ভুল"
     delay(120);
+    if (prefix) { motors_show_pattern(prefix, 300); delay(500); }
     motors_show_sequential(expected, 320, 180);   // feel the right answer
   }
   if (action == TA_HINT) {
     audio_play_blocking(54);
+    if (prefix) { motors_show_pattern(prefix, 300); delay(500); }
     motors_show_sequential(expected, 400, 220);
   }
 
