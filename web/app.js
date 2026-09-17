@@ -13,6 +13,7 @@ import {
 } from './rule_engine.js';
 import { BrailleCell, KeyPad, dotsToMask, maskToDots } from './braille_cell.js';
 import { LearnerState, AttemptLogger, deviceId, uuid } from './storage.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 const MAX_TRIES_PER_PROMPT = 4;   // then move on regardless
 const $ = (id) => document.getElementById(id);
@@ -24,7 +25,7 @@ const COMBINING = new Set(['ঁ', 'ং', 'ঃ']);
 const displayChar = (ch) => (COMBINING.has(ch) ? '◌' + ch : ch);
 
 const ui = {
-  mapWarning: $('mapWarning'), syncStatus: $('syncStatus'),
+  syncStatus: $('syncStatus'),
   setup: $('setup'), practice: $('practice'),
   userId: $('userId'), mode: $('mode'), setLen: $('setLen'), charSet: $('charSet'),
   startBtn: $('startBtn'), exportBtn: $('exportBtn'), flushBtn: $('flushBtn'),
@@ -33,7 +34,7 @@ const ui = {
   promptChar: $('promptChar'), promptName: $('promptName'),
   replayBtn: $('replayBtn'), submitBtn: $('submitBtn'), clearBtn: $('clearBtn'),
   hintBtn: $('hintBtn'), stopBtn: $('stopBtn'),
-  hintBox: $('hintBox'), feedback: $('feedback'), unverifiedTag: $('unverifiedTag'),
+  hintBox: $('hintBox'), feedback: $('feedback'),
   stRows: $('stRows'), stAcc: $('stAcc'), stSess: $('stSess'), stDays: $('stDays'),
   stChars: $('stChars'), stQueue: $('stQueue'),
   taTable: $('taTable'), csTable: $('csTable'), charTable: $('charTable'),
@@ -46,7 +47,7 @@ const MODE_NOTES = {
 };
 
 const state = {
-  letters: [], mapVerified: false, active: [],
+  letters: [], active: [],
   learner: null, logger: null, cell: null, pad: null,
   audio: new Map(),
   session: null, current: null, running: false,
@@ -65,8 +66,6 @@ async function boot() {
   }
   const map = await res.json();
   state.letters = map.letters;
-  state.mapVerified = Boolean(map.verified);
-  renderMapBanner(map);
 
   state.cell = new BrailleCell($('cell'));
   state.pad = new KeyPad(document.querySelector('.keys'), {
@@ -79,6 +78,8 @@ async function boot() {
     ui.syncStatus.textContent = msg;
   });
 
+  checkSupabase();
+
   ui.userId.value = localStorage.getItem('braille.lastUser') || 'P01';
   ui.setLen.value = SESSION_TARGET_ATTEMPTS;
   loadLearner();
@@ -87,34 +88,27 @@ async function boot() {
   renderAll();
 }
 
-/**
- * Verification is per letter, because images arrive in batches. A blanket
- * "everything is unverified" banner would stay up for weeks while genuinely
- * verified characters were already usable, and would train everyone to ignore it.
- */
-function renderMapBanner(map) {
-  const total = map.letters.length;
-  const n = map.letters.filter((l) => l.verified).length;
-  const el = ui.mapWarning;
-  el.classList.add('show');
-
-  if (n === total) {
-    el.classList.add('ok');
-    el.innerHTML = `<b>✓ Braille mapping verified.</b> All ${total} letters were read from
-      supplied reference images. Safe to use with real learners.`;
+async function checkSupabase() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    ui.syncStatus.className = '';
+    ui.syncStatus.textContent = 'offline (no Supabase config)';
     return;
   }
-  el.classList.remove('ok');
-  const missing = map.letters.filter((l) => !l.verified);
-  const vowels = missing.filter((l) => l.category === 'vowel').length;
-  el.innerHTML = `<b>⚠ Braille mapping verified for ${n} of ${total} letters.</b>
-    The remaining ${total - n} (${vowels} vowel, ${missing.length - vowels} consonant)
-    still carry <b>Bharati placeholder</b> patterns not checked against the Bangladesh
-    National Braille code. Practising a placeholder character is marked on the prompt,
-    and every logged row records whether <i>that character</i> was verified — so
-    verified rows stay usable while the rest of the alphabet is confirmed.
-    Add images to <span class="mono">braille_img/</span> and run
-    <span class="mono">tools/import_braille_images.py</span>.`;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts?limit=0`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    });
+    if (res.ok || res.status === 406) {
+      ui.syncStatus.className = 'ok';
+      ui.syncStatus.textContent = 'Supabase connected';
+    } else {
+      ui.syncStatus.className = 'error';
+      ui.syncStatus.textContent = `Supabase error ${res.status}`;
+    }
+  } catch {
+    ui.syncStatus.className = 'error';
+    ui.syncStatus.textContent = 'Supabase unreachable';
+  }
 }
 
 function loadLearner() {
@@ -295,7 +289,6 @@ function nextPrompt(prevAction = null, prevLetter = null) {
   ui.promptChar.textContent = displayChar(letter.char);
   ui.promptChar.classList.remove('prompt-hidden');
   ui.promptName.textContent = `${letter.name} — enter the dots you hear`;
-  ui.unverifiedTag.classList.toggle('show', !letter.verified);
   ui.attemptNo.textContent = state.session.attemptIndex + 1;
   ui.diffLevel.textContent = state.learner.data.difficulty;
   playPrompt(true);
