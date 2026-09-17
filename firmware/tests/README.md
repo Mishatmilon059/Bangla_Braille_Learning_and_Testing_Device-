@@ -15,7 +15,7 @@ to see, so you know whether it passed without guessing.
 | 3b | `t3b_braille_patterns` | A typed letter buzzes the right dots | Motor channel swapped — dot 3 fires where dot 4 should |
 | 4 | `t4_dfplayer` | Audio plays by track number | Files not in `/mp3`, or not named `0001.mp3` |
 | 5 | `t5_sd` | Card mounts, CSV appends | 3.3V-only module fed 5V, or CS on the wrong pin |
-| 6 | `t6_model` | TFLite Micro matches `train.py` | Arena too small, or stale `model_data.h` |
+| 6 | `t6_model` | *(legacy TFLite test — superseded)* The main firmware now uses `model_weights.h` + `inference.h` (pure C float arrays, no arena). Skip this unless you are specifically debugging a TFLite build. | Arena too small, or stale `model_data.h` |
 
 Only after all six pass should you flash `braille_tutor.ino`. `t3b` is optional
 for bring-up but is the one place you can check a Braille cell by touch before
@@ -41,30 +41,35 @@ Sketches 3b and 6 and the main firmware need the generated headers, and each
 Arduino sketch folder needs its own copy. From the repo root:
 
 ```bash
-python3 tools/gen_engine.py
-python3 tools/gen_braille_header.py
-python3 tools/train.py && python3 tools/tflite_to_header.py
-cp firmware/braille_tutor/{rule_engine.h,braille_map.h,model_data.h} firmware/tests/t6_model/
+python3 tools/gen_engine.py          # regenerates rule_engine.h, rule_engine.js, rule_engine_gen.py
+python3 tools/gen_braille_header.py  # regenerates braille_map.h
+python3 tools/train_and_export.py    # trains sklearn MLP, exports model_weights.h + golden_vectors.json
 cp firmware/braille_tutor/braille_map.h firmware/tests/t3b_braille_patterns/
+# t6_model uses model_data.h (TFLite, legacy) -- skip if using the current sklearn pipeline
 ```
 
 Re-run the copy after every `gen_braille_header.py` — the copies are snapshots,
 and a stale one means `t3b` buzzes a pattern the rest of the system no longer
 believes in.
 
-## Why t6 can fail even when the model is fine
+## Model deployment — current pipeline (sklearn → C arrays)
 
-TFLite Micro's `FULLY_CONNECTED` kernel takes **one** requantization multiplier
-from `filter->params.scale` and applies it to every output channel. TFLite's
-converter defaults to **per-channel** weights — one scale per output unit.
-Nothing rejects that combination: TFLM loads the model, runs it, and quietly
-uses channel 0's scale for all channels. The softmax still sums to 1.0 and the
-output still looks like a probability distribution; it is just the wrong one.
+The project no longer uses TFLite. The model is exported directly as C float
+arrays by `tools/train_and_export.py`:
 
-`tools/train.py` therefore disables per-channel quantization for the Dense
-layers, and asserts after conversion that no weight tensor carries more than one
-scale. If you ever see t6 report plausible-but-wrong classes while the desktop
-model is correct, check that first.
+```
+firmware/braille_tutor/model_weights.h   1,734 floats (6,936 bytes), PROGMEM-ready
+firmware/braille_tutor/inference.h       forward pass: ml_infer(&features, &ta, &cs)
+firmware/braille_tutor/rule_engine.h     normalize_features() + Features struct
+```
+
+No arena, no quantization, no runtime library. Call `ml_infer()` anywhere
+`rule_engine.h` is included. Inference time: ~0.1 ms at 240 MHz.
+
+To verify the exported model matches training, use the 20 golden vectors in
+`models/golden_vectors.json` — each has `features_raw`, `features_norm`,
+`expect_teaching`, and `expect_confidence`. `t11_ml_test` runs these vectors
+against the live hardware and prints PASS/FAIL to Serial Monitor at boot.
 
 ---
 

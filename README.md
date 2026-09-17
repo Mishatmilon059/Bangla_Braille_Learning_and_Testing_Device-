@@ -9,7 +9,7 @@ Three pieces:
 | Piece | What it is | Where |
 |---|---|---|
 | **MVP web app** | Data-collection instrument. Single page, no build step. | `web/` |
-| **Training pipeline** | CSV → multi-task net → int8 TFLite → C header | `tools/` |
+| **Training pipeline** | CSV → multi-task sklearn MLP → C float arrays | `tools/` |
 | **Firmware** | ESP32 sketch, no WiFi, inference on-device | `firmware/` |
 
 ---
@@ -19,15 +19,17 @@ Three pieces:
 Two data files are the source of truth. Almost everything else is **generated**:
 
 ```
-spec/engine_spec.json  ──gen_engine.py──►  web/rule_engine.js
-                                           firmware/braille_tutor/rule_engine.h
-                                           tools/rule_engine_gen.py
+spec/engine_spec.json  ──gen_engine.py──────►  web/rule_engine.js
+                                               firmware/braille_tutor/rule_engine.h
+                                               tools/rule_engine_gen.py
 
 data/braille_map.json  ──gen_braille_header.py──►  firmware/braille_tutor/braille_map.h
                        ──gen_braille_images.py──►  assets/braille/*.svg, *.png
                        ──gen_audio.py───────────►  web/audio/, sd_card/mp3/
 
-models/model.tflite    ──tflite_to_header.py──►  firmware/braille_tutor/model_data.h
+dataset/real_v3.csv  ──train_and_export.py──►  firmware/braille_tutor/model_weights.h
+dataset/synthetic_2k.csv                        models/metrics_final.json
+                                                models/golden_vectors.json
 ```
 
 This exists to kill one bug class: the web app and the ESP32 computing features
@@ -41,10 +43,10 @@ regenerate, re-run parity.
 ## Quick start
 
 ```bash
-pip install tensorflow numpy Pillow
+pip install scikit-learn numpy Pillow
 sudo apt-get install -y espeak-ng ffmpeg
 
-python3 tools/gen_engine.py            # 3 rule engines
+python3 tools/gen_engine.py            # 3 rule engines (JS, C, Python)
 python3 tools/gen_braille_header.py    # firmware dot table
 python3 tools/gen_braille_images.py    # 50 SVG + 50 PNG + contact sheet
 python3 tools/gen_audio.py             # 50 letters + 10 prompts
@@ -165,13 +167,14 @@ sampling produces impossible vectors (`current_streak=7` beside
 ### 3. Train
 
 ```bash
-python3 tools/train.py
-python3 tools/tflite_to_header.py
+python3 tools/train_and_export.py
 ```
 
-Reports **real-only test accuracy separately** from combined, with a
-majority-class baseline beside every number, and dumps held-out disagreements
-to `models/disagreements.csv`.
+Trains two sklearn MLPClassifiers (teaching-action head + confidence-state head)
+on `dataset/real_v3.csv` + `dataset/synthetic_2k.csv`, then exports weights
+directly as C float arrays into `firmware/braille_tutor/model_weights.h`.
+Reports **real-only test accuracy** separately from combined, with a
+majority-class baseline beside every number.
 
 ### 4. Hardware
 
@@ -186,20 +189,36 @@ sd_card/mp3/  →  copy to the microSD card root (DFPlayer needs a folder named 
 
 ## What this model actually is — read before writing it up
 
-The labels come from the rule engine. A 790-parameter network trained on them
-learns to **compress your if/else logic**, reaching ~100% agreement on
-synthetic data. It does not discover teaching policy. Only 4 of the 14 logged
-features (`response_time`, `press_duration`, `retry_count`, `wrong_streak`)
-are actually fed to the model — the rest are kept in the database for
-analysis but read by no rule, so the model has nothing to gain from them.
+The labels come from the rule engine. A **1,734-parameter** dual-head network
+trained on them learns to **compress your if/else logic**, reaching ~99% agreement
+on synthetic data and **98.6% / 91.4% real-only test accuracy** (teaching action /
+confidence state) on 1,000 real collected rows.
 
-That is a legitimate TinyML result — train → quantize → deploy → real-time
-offline inference at ~5.5 KB — and it should be written up that way. Describing
-it as autonomous adaptive learning would be false, and any examiner who asks
-"where did the labels come from?" will find that out in one question.
+**8 of the 14 logged features** are fed to the model:
+`response_time`, `press_duration`, `retry_count`, `prev_accuracy`,
+`prev_mastery`, `hint_count`, `current_streak`, `wrong_streak`.
+The other 6 are logged for analysis but read by no rule, so the model has
+nothing to gain from them.
 
-The genuinely interesting material is `models/disagreements.csv`: the held-out
-**real** rows where the model departs from the rule engine. Read them.
+Architecture: `Input(8) → Dense(32, ReLU) → Dense(16, ReLU) → [Dense(3) TA head, Dense(3) CS head]`
+
+Implementation: sklearn `MLPClassifier` (TensorFlow is incompatible with Python 3.12
+on Windows). Weights are exported as C float arrays — no TFLite, no arena,
+no external library. `firmware/braille_tutor/inference.h` provides a self-contained
+forward pass (~0.1 ms at 240 MHz).
+
+Dataset: **1,000 real rows** (P01=315, P02=320, P03=364, P04=1) +
+**1,242 synthetic** = 2,242 total. See `models/metrics_final.json` for per-class F1.
+
+That is a legitimate embedded-ML result — train → export C arrays → real-time
+offline inference at **6.9 KB** (1,734 × 4 bytes) — and it should be written up
+that way. Describing it as autonomous adaptive learning would be false, and any
+examiner who asks "where did the labels come from?" will find that out in one
+question.
+
+The genuinely interesting comparison is `t11_ml_test`: flash it and watch the
+**MATCH/MISMATCH** log on Serial Monitor — the cases where the network departs
+from the rule engine on real presses are the ones worth reading.
 
 ---
 
@@ -234,8 +253,10 @@ Three things that will bite you, in order of likelihood:
 3. **GPIO 2 and 15 are strapping pins** — add 10 kΩ pulldowns. GPIO 12 is
    deliberately unused; it must be LOW at boot.
 
-**Fit:** model 5,480 B + 8 KB arena ≈ **13.4 KB of 520 KB SRAM**. Size was never
-the risk on this project.
+**Fit:** model weights 6,936 B (1,734 floats) — **no arena, no runtime library**.
+`inference.h` allocates two stack arrays (32 + 16 floats = 192 B) during the
+forward pass and frees them immediately. Total: ≈ **7.1 KB of 520 KB SRAM**.
+Size was never the risk on this project.
 
 ### The RTC, and why it matters
 
@@ -264,7 +285,7 @@ whichever mode fits the session.
 | Single-letter remote | Minimal page: pick one letter, send it | `web/remote_control.html` |
 | **t10_learning** | Teach mode: audio + motor vibration teaches the pattern, retries until correct, reports every attempt | `firmware/tests/t10_learning/` |
 | **t11_testing** | Assessment mode: audio only (no vibration cue), one attempt per letter, no retry, prints a batch summary to Serial when the teacher's whole selection is done | `firmware/tests/t11_testing/` |
-| **t11_ml_test** | Same flow as t10_learning, but also runs the on-device ML model side-by-side with the rule engine and logs the model's decision (not a placeholder) to Supabase, so you can inspect MATCH/MISMATCH cases | `firmware/t11_ml_test/` |
+| **t11_ml_test** | Same flow as t10_learning, but also runs the on-device ML model side-by-side with the rule engine after every attempt and prints MATCH/MISMATCH to Serial Monitor — **no data goes to Supabase** | `firmware/t11_ml_test/` |
 
 Only flash **one** of `t10_learning` / `t11_testing` / `t11_ml_test` at a time
 — whichever the teacher panel's current tab needs (শেখানো → t10_learning or
@@ -357,20 +378,30 @@ today. Every figure in it is checked against the source data.
 ## Layout
 
 ```
-spec/engine_spec.json        ⭐ 14 features, thresholds, normalization
+spec/engine_spec.json        ⭐ 14 features, 8 model inputs, thresholds, normalization
 data/braille_map.json        ⭐ 50 letters → dot patterns + per-letter verified
+dataset/real_v3.csv          1,000 real rows (P01-P04, spec_version=2)
+dataset/synthetic_2k.csv     1,242 synthetic rows (fitted to real distribution)
+models/metrics_final.json    test accuracy + per-class F1 for last trained model
+models/golden_vectors.json   20 ESP32 boot self-test vectors
 braille_img/                 reference cell images used to verify the map
+data/braille_verified.zip    cropped reference images used by tools/check_*.py
 tools/braille_aliases.json   filename → letter, the ONLY lookup path
 assets/braille/              generated SVG + PNG + contact sheet
 web/                         MVP data-collection app (rule_engine.js is GENERATED)
 web/teacher.html, teacher.js remote teacher panel -- Learn/Test over Supabase
 web/remote_control.html      minimal single-letter remote sender
-tools/                       generators, dataset, training, tests
-firmware/braille_tutor/      main OFFLINE sketch (3 headers are GENERATED)
+tools/                       generators, dataset, training, parity tests
+tools/gen_engine.py          ⭐ regenerates all 3 rule engines from spec
+tools/train_and_export.py    ⭐ trains sklearn MLP + exports model_weights.h
+tools/parity_py_js.py        Python vs JS parity check (500 vectors, 100% match)
+tools/check_*.py, verify_*.py  braille pattern QA scripts (26 files)
+firmware/braille_tutor/      main OFFLINE sketch (rule_engine.h, braille_map.h,
+                              model_weights.h, inference.h are GENERATED/exported)
 firmware/tests/              staged bring-up sketches t1..t9, plus the
                               remote-mode sketches t7_cloud_dot, t8_cloud_quiz,
                               t10_learning, t11_testing (see README.md there)
-firmware/t11_ml_test/        remote learning + on-device ML vs rule-engine log
+firmware/t11_ml_test/        remote learning + Serial Monitor ML vs rule-engine log
 supabase/full_setup.sql      ⭐ single idempotent migration -- run this one
 supabase/schema.sql          original attempts-table-only schema (superseded)
 sd_card/mp3/                 audio, ready to copy to the card
