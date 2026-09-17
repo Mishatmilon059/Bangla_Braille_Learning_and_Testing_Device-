@@ -52,7 +52,9 @@ create table if not exists attempts (
   constraint attempts_streak_exclusive  check (current_streak = 0 or wrong_streak = 0)
 );
 
--- teaching_action: update constraint to 3 classes (REPEAT, HINT, NORMAL_PRACTICE)
+-- teaching_action: migrate old 6-class values (3/4/5) to NORMAL_PRACTICE (2)
+-- before tightening the constraint, so re-runs on existing data don't fail.
+update attempts set teaching_action = 2 where teaching_action > 2;
 alter table attempts drop constraint if exists attempts_teaching_range;
 alter table attempts add constraint attempts_teaching_range
   check (teaching_action between 0 and 2);
