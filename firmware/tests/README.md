@@ -65,3 +65,46 @@ output still looks like a probability distribution; it is just the wrong one.
 layers, and asserts after conversion that no weight tensor carries more than one
 scale. If you ever see t6 report plausible-but-wrong classes while the desktop
 model is correct, check that first.
+
+---
+
+## Remote / cloud-connected sketches — a separate track
+
+Everything above builds toward `braille_tutor.ino`, which is deliberately
+WiFi-free. The sketches below are a **parallel, separate mode**: the ESP32
+joins WiFi and polls Supabase for commands from `web/teacher.html`, instead of
+running the on-device model. See the root `README.md`'s "Remote / cloud-
+connected mode" section for the full data-flow diagram and one-time Supabase
+setup. Summary here:
+
+| Sketch | Role | Flash it when... |
+|---|---|---|
+| `t7_cloud_dot` | Earliest bring-up: buzz one dot on command | Verifying WiFi + Supabase reachability, motors only |
+| `t8_cloud_quiz` | Full quiz flow prototype | Superseded by `t11_testing`; kept for reference |
+| `t9_dfplayer_test` | Pure DFPlayer diagnostic, no WiFi | Audio not playing and you need to isolate hardware from network |
+| `t10_learning` | Teach mode: audio + vibration, retries until correct, reports every attempt to `attempts` | Teacher panel's শেখানো (Learn) tab |
+| `t11_testing` | Assessment mode: audio only, one attempt, no retry, Serial batch summary at the end | Teacher panel's পরীক্ষা (Test) tab |
+| `firmware/t11_ml_test/` *(one level up, not under `tests/`)* | Same as `t10_learning` but also runs the on-device ML model and logs its real decision, for inspecting model-vs-rule-engine agreement | Comparing the trained model against the rule engine on real presses |
+
+Only flash **one of these at a time** — they share `device_id: "esp32_01"`
+and will all respond to the same `remote_commands` rows otherwise, which
+looks like the board answering with the wrong behavior. Each folder has its
+own `secrets.h` (gitignored) that needs real `WIFI_SSID`/`WIFI_PASS` filled
+in before it'll connect.
+
+**Verified pin mapping** (all remote-mode sketches share this — see each
+folder's `pins.h`):
+
+```
+PIN_BUTTON = { 32, 33, 25, 26, 27, 14 }   // dot 1..6
+PIN_MOTOR  = { 21, 13, 22, 2, 15, 4 }     // dot 1..6 -- confirmed against
+                                          // physical wiring via a button-
+                                          // press-buzzes-same-dot sync test;
+                                          // do not "simplify" this ordering
+PIN_SUBMIT = 12                          // strapping pin, must read LOW at boot
+```
+
+If you rewire and need to re-verify this mapping, flash `t_sync_test`: hold
+each dot button in turn and confirm the SAME dot's motor buzzes. `t_motor_test`
+is the same idea without WiFi, for isolating a motor/ULN2803A problem from the
+network stack.

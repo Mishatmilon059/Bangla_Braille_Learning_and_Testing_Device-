@@ -154,6 +154,11 @@ static double buttons_mean_press_duration() {
   return n == 0 ? 0.0 : (double)total / (double)n;
 }
 
+static inline bool buttons_any_held() {
+  for (int i = 0; i < 6; i++) if (g_btn.stable[i]) return true;
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Submit button -- separate from the six dot buttons on purpose. Nothing
 // above this reads PIN_SUBMIT, so adding it here does not change how the

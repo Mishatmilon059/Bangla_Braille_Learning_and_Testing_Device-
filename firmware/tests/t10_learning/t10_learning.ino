@@ -1,12 +1,15 @@
 // t10: Learning module
 //
 // Flow per round:
-//   1. Select a letter on remote_control.html
+//   1. Teacher selects a letter in web/teacher.html's "শেখানো" (Learn) tab --
+//      there is no web input path, only the physical ESP32 buttons answer.
 //   2. Speaker plays the letter audio
-//   3. Motors vibrate each dot sequentially (500ms on, 400ms gap) -- teaches the pattern
+//   3. Motors vibrate each dot sequentially (500ms on, 500ms gap) -- teaches the pattern
 //   4. User presses the dot buttons then SUBMIT
 //   5. Correct  -> speaker says "sothik" (track 51), round done
 //   6. Wrong    -> replay audio + motor pattern, wait for input again (infinite retry)
+//   Every attempt (right or wrong, each retry included) is POSTed to
+//   Supabase's `attempts` table, so the teacher panel shows it live.
 //
 // Serial Monitor: 115200 baud
 
@@ -32,8 +35,10 @@
 static const char *SUPABASE_URL      = "https://rufaacgatrebsyxnyfbq.supabase.co";
 static const char *SUPABASE_ANON_KEY = "sb_publishable_lI3qv5Xk44GAhzL4R7I2GA_4k1aUar-";
 
-static long     g_last_id   = -1;
-static uint32_t g_last_poll = 0;
+static long     g_last_id     = -1;
+static uint32_t g_last_poll   = 0;
+static int      g_attempt_idx = 0;
+static char     g_session_id[24];
 
 // A fresh WiFiClientSecure means a full TLS handshake (0.5-3s on ESP32) --
 // expensive enough that doing it on every 700ms poll makes the whole loop
@@ -203,14 +208,17 @@ static void print_dot_bits(uint8_t mask) {
   for (int i = 0; i < 6; i++) Serial.printf("dot%d=%d ", i + 1, (mask >> i) & 1);
 }
 
-static uint8_t wait_for_submit() {
+// Returns the dot mask; writes call-to-submit elapsed time into *out_rt_ms if given.
+static uint8_t wait_for_submit(uint32_t *out_rt_ms = nullptr) {
   wait_release_all();       // clean baseline -- nothing carried over
   buttons_reset_attempt();
 
   Serial.println("[learn] Waiting for dot buttons + SUBMIT...");
+  uint32_t t0 = millis();
   for (;;) {
     buttons_poll();
     if (submit_pressed()) {
+      if (out_rt_ms) *out_rt_ms = millis() - t0;
       Serial.print("[learn] raw at submit: ");
       print_dot_bits(g_btn.mask);
       Serial.printf(" (mask=0x%02X)\n", g_btn.mask);
@@ -218,6 +226,76 @@ static uint8_t wait_for_submit() {
     }
     delay(5);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Report one attempt (right or wrong) to Supabase's `attempts` table, so the
+// teacher panel's live "শেখানো" (Learn) view and dashboard show it -- without
+// this, learning-mode attempts never left this board at all. Every retry
+// gets its own row (retry_count increments), matching how the wrong-then-
+// right sequence actually happened, rather than only reporting the final
+// correct submission.
+// ---------------------------------------------------------------------------
+
+static String press_order_json() {
+  String s = "[";
+  for (int i = 0; i < g_btn.press_count; i++) {
+    if (i) s += ",";
+    s += String(g_btn.press_order[i]);
+  }
+  s += "]";
+  return s;
+}
+
+static void report_attempt(int letter_id, uint8_t expected, uint8_t entered,
+                            uint32_t response_time_ms, int retry_count) {
+  bool correct = (entered == expected);
+
+  String body = "{";
+  body += "\"user_id\":\"S01\",";
+  body += "\"session_id\":\"" + String(g_session_id) + "\",";
+  body += "\"device_id\":\""  + String(DEVICE_ID)     + "\",";
+  body += "\"attempt_index\":" + String(g_attempt_idx) + ",";
+  body += "\"char_id\":"       + String(letter_id) + ",";
+  body += "\"response_time\":" + String(response_time_ms) + ",";
+  body += "\"press_duration\":" + String(buttons_mean_press_duration(), 1) + ",";
+  body += "\"retry_count\":"   + String(retry_count) + ",";
+  body += "\"prev_accuracy\":0,";
+  body += "\"prev_mastery\":0,";
+  body += "\"hint_count\":0,";
+  body += "\"session_number\":1,";
+  body += "\"difficulty_level\":1,";
+  body += "\"time_since_last_practice\":0,";
+  body += "\"prev_confidence\":0,";
+  body += "\"current_streak\":0,";
+  body += "\"wrong_streak\":0,";
+  body += "\"prev_mistakes\":0,";
+  body += "\"teaching_action\":"  + String(correct ? 2 : (retry_count == 0 ? 0 : 1)) + ",";
+  body += "\"confidence_state\":" + String(correct ? 0 : 1) + ",";
+  body += "\"expected_pattern\":" + String(expected) + ",";
+  body += "\"entered_pattern\":"  + String(entered) + ",";
+  body += "\"is_correct\":"       + String(correct ? "true" : "false") + ",";
+  body += "\"press_order\":\""    + press_order_json() + "\",";
+  body += "\"source\":\"esp32\",";
+  body += "\"is_synthetic\":false,";
+  body += "\"spec_version\":2,";
+  body += "\"braille_map_verified\":true";
+  body += "}";
+
+  HTTPClient http;
+  http.begin(https_client(), String(SUPABASE_URL) + "/rest/v1/attempts");
+  http.setReuse(true);
+  http.addHeader("apikey",        SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.addHeader("Content-Type",  "application/json");
+  http.addHeader("Prefer",        "return=minimal");
+
+  int code = http.POST(body);
+  Serial.printf("[learn] reported attempt -> HTTP %d\n", code);
+  if (code < 200 || code >= 300) Serial.println(http.getString());
+  http.end();
+
+  g_attempt_idx++;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +363,7 @@ static void learning_round(int letter_id) {
     Serial.printf("[learn] Letter #%d (TWO-STAGE) track=%d s1=0x%02X s2=0x%02X\n",
                   letter_id, track, s1, s2);
     Serial.printf("==============================\n");
+    int retry_count = 0;
 
     for (;;) {
       // 1. Audio
@@ -302,19 +381,25 @@ static void learning_round(int letter_id) {
 
       // 3. Input stage 1
       Serial.println("[learn] Input stage1 then SUBMIT...");
-      uint8_t in1 = wait_for_submit();
+      uint32_t rt1;
+      uint8_t in1 = wait_for_submit(&rt1);
       Serial.printf("[learn] stage1: entered=0x%02X expected=0x%02X\n", in1, s1);
       if (in1 != s1) {
         Serial.println("[learn] stage1 WRONG -- replaying from start.");
+        report_attempt(letter_id, s1, in1, rt1, retry_count);
+        retry_count++;
         delay(300); continue;
       }
 
       // 4. Input stage 2
       Serial.println("[learn] Input stage2 then SUBMIT...");
-      uint8_t in2 = wait_for_submit();
+      uint32_t rt2;
+      uint8_t in2 = wait_for_submit(&rt2);
       Serial.printf("[learn] stage2: entered=0x%02X expected=0x%02X\n", in2, s2);
+      report_attempt(letter_id, s2, in2, (rt1 + rt2) / 2, retry_count);
       if (in2 != s2) {
         Serial.println("[learn] stage2 WRONG -- replaying from start.");
+        retry_count++;
         delay(300); continue;
       }
 
@@ -326,6 +411,7 @@ static void learning_round(int letter_id) {
     Serial.printf("[learn] Letter #%d track=%d dots=0x%02X\n",
                   letter_id, track, expected);
     Serial.printf("==============================\n");
+    int retry_count = 0;
 
     for (;;) {
       play_and_wait(track, 7000);
@@ -333,10 +419,13 @@ static void learning_round(int letter_id) {
       motors_show_sequential(expected, DOT_ON_MS, DOT_GAP_MS);
       delay(800);
 
-      uint8_t entered = wait_for_submit();
+      uint32_t rt_ms;
+      uint8_t entered = wait_for_submit(&rt_ms);
       Serial.printf("[learn] entered=0x%02X expected=0x%02X -> %s\n",
                     entered, expected, entered == expected ? "CORRECT" : "WRONG");
+      report_attempt(letter_id, expected, entered, rt_ms, retry_count);
       if (entered == expected) break;
+      retry_count++;
       delay(400);
     }
   }
@@ -375,6 +464,8 @@ void setup() {
   WiFi.persistent(false);
   wifi_connect();
   sync_latest_id();
+
+  snprintf(g_session_id, sizeof(g_session_id), "esp32_learn_%lu", millis());
 
   Serial.println("\n[ready] Select a letter on remote_control.html to begin.\n");
 }

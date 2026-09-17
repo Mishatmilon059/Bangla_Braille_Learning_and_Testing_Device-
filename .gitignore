@@ -15,6 +15,7 @@ firmware/tests/t8_cloud_quiz/secrets.h
 firmware/tests/t9_dfplayer_test/secrets.h
 firmware/tests/t10_learning/secrets.h
 firmware/tests/t11_testing/secrets.h
+firmware/t11_ml_test/secrets.h
 
 
 # training intermediates

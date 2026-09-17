@@ -186,17 +186,6 @@ body {
 .warn-title { font-size: 13px; font-weight: 600; color: var(--amber); }
 .warn-body  { font-size: 12px; color: #92400e; margin-top: 4px; }
 
-/* ── Hardware simulator ──────────────────── */
-.sim-dots { display: grid; grid-template-columns: repeat(2, 48px); gap: 10px; margin: 8px auto; }
-.sim-dot {
-  width: 48px; height: 48px; border-radius: 50%; background: var(--bg);
-  border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 700; cursor: pointer; color: var(--text2);
-  font-family: var(--font); transition: all .1s;
-}
-.sim-dot.on { background: var(--green); color: #fff; border-color: var(--green-dark); }
-.sim-btn-row { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
-
 /* ── Results ────────────────────────────── */
 .score-ring {
   width: 120px; height: 120px; margin: 0 auto 12px;
@@ -355,20 +344,9 @@ body {
     <button class="btn primary" id="btn-seq-teach">▶ পাঠদান শুরু করুন</button>
     <button class="btn danger"   id="btn-seq-stop">✕ পাঠদান থামান</button>
 
-    <div class="card" style="margin-top:4px">
-      <div class="card-lbl center">হার্ডওয়্যার সিমুলেটর</div>
-      <div class="sim-dots">
-        <button class="sim-dot" data-dot="1">১</button>
-        <button class="sim-dot" data-dot="4">৪</button>
-        <button class="sim-dot" data-dot="2">২</button>
-        <button class="sim-dot" data-dot="5">৫</button>
-        <button class="sim-dot" data-dot="3">৩</button>
-        <button class="sim-dot" data-dot="6">৬</button>
-      </div>
-      <div class="sim-btn-row">
-        <button class="btn-sm" style="background:var(--bg);color:var(--text2);border:1.5px solid var(--border)" id="btn-sim-clear">মুছুন</button>
-        <button class="btn-sm" style="background:var(--green);color:#fff" id="btn-sim-submit">সাবমিট করুন</button>
-      </div>
+    <div class="warn-card">
+      <div class="warn-title">ℹ️ শুধু হার্ডওয়্যার ইনপুট</div>
+      <div class="warn-body">ছাত্র ESP32-এর পুশ বাটনে ডট চাপবে এবং SUBMIT চাপবে। ওয়েব থেকে কোনো ইনপুট দেওয়ার সুযোগ নেই।</div>
     </div>
   </div><!-- /panel-seq -->
 

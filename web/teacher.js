@@ -78,7 +78,6 @@ const S = {
   sessionStart:  null,
   lastAttemptId: null,
   pollTimer:     null,
-  simDots:       new Set(),
   studentId:  'S01',
   deviceId:   'esp32_01',
   weaknesses: {},
@@ -569,52 +568,6 @@ function resTab(tab) {
   }
 }
 
-// ─── Hardware simulator ───────────────────────────────────────────────────────
-function simToggleDot(d) {
-  if (S.simDots.has(d)) S.simDots.delete(d); else S.simDots.add(d);
-  document.querySelectorAll('.sim-dot').forEach(btn =>
-    btn.classList.toggle('on', S.simDots.has(+btn.dataset.dot)));
-}
-
-async function simSubmit() {
-  // Learn screen only -- test mode has no web input path (see init()).
-  const letter = S.learnMode === 'seq'
-    ? LETTERS[S.seqIdx]
-    : S.rndSelected !== null
-      ? LETTERS[S.rndSelected]
-      : null;
-
-  if (!letter) { showToast('প্রথমে একটি বর্ণ বাজান'); return; }
-
-  const entered    = [...S.simDots].reduce((m, d) => m | (1 << (d - 1)), 0);
-  const expected   = letter.mask;
-  const is_correct = entered === expected;
-  const ta = is_correct ? 2 : (S.simDots.size === 0 ? 0 : 1);
-  const cs = is_correct ? 0 : 1;
-
-  await sbPost('attempts', {
-    user_id: S.studentId, session_id: crypto.randomUUID(), device_id: S.deviceId,
-    attempt_index: 0, char_id: letter.id,
-    response_time: 1500, press_duration: 200, retry_count: 0,
-    prev_accuracy: 0.7, prev_mastery: 0.6, hint_count: 0,
-    session_number: 1, difficulty_level: 2, time_since_last_practice: 0,
-    prev_confidence: 1, current_streak: 0, wrong_streak: 0, prev_mistakes: 0,
-    teaching_action: ta, confidence_state: cs,
-    expected_pattern: expected, entered_pattern: entered,
-    is_correct, press_order: '[]',
-    source: 'web', is_synthetic: false, spec_version: 2, braille_map_verified: true,
-    created_at: new Date().toISOString(),
-  });
-
-  S.simDots.clear();
-  document.querySelectorAll('.sim-dot').forEach(b => b.classList.remove('on'));
-}
-
-function simClear() {
-  S.simDots.clear();
-  document.querySelectorAll('.sim-dot').forEach(b => b.classList.remove('on'));
-}
-
 // ─── Mode switching ───────────────────────────────────────────────────────────
 function setLearnMode(lm) {
   S.learnMode = lm;
@@ -723,14 +676,6 @@ export async function init() {
   el('ans-tab-w').addEventListener('click', () => resTab('wrong'));
   el('btn-res-retry').addEventListener('click', testInit);
   el('btn-res-home').addEventListener('click', () => showScreen('learn'));
-
-  // Hardware simulator -- Learn screen only. Test mode has no web input path:
-  // the student must answer on the physical ESP32 buttons, so the simulator
-  // is intentionally not present on screen-test-run.
-  document.querySelectorAll('.sim-dot').forEach(btn =>
-    btn.addEventListener('click', () => simToggleDot(+btn.dataset.dot)));
-  el('btn-sim-clear').addEventListener('click', simClear);
-  el('btn-sim-submit').addEventListener('click', simSubmit);
 
   // Bottom nav
   el('nav-dash').addEventListener('click',  () => showScreen('learn'));

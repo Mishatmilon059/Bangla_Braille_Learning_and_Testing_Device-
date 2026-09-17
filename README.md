@@ -65,19 +65,27 @@ python3 -m http.server 8000
 
 ---
 
-## Braille verification status — 11 of 50
+## Braille verification status — 50 of 50
 
-Verification is tracked **per letter**, because reference images arrive in
-batches. All 11 vowels were read from `braille_img/`; the 39 consonants still
-carry Bharati **placeholder** patterns.
+All 50 letters are now verified against the Bangladesh National Braille Code
+(cross-checked against Wikipedia's Bengali Braille table) — `data/braille_map.json`
+and the generated `firmware/braille_tutor/braille_map.h` both carry
+`BRAILLE_MAP_VERIFIED 1` / `BRAILLE_VERIFIED_COUNT 50`. Every row's
+`braille_map_verified` flag in logged data can be trusted.
 
-The 11 vowels confirmed 10 of my placeholder guesses and **corrected one**:
-ঋ was `[2,3,5]`, actually `[1,2,3,5]` (`⠗`).
+### The ঋ / র collision, and how it's actually resolved
 
-### Adding the remaining 39
+ঋ (ri) and র (ra) share the same 5-dot cell (`[1,2,3,5]`) — genuinely, per the
+Braille standard, not a data error. They're told apart by making ঋ a
+**two-cell** character: a short prefix vibration (dot 5) plays before the
+answer cell, and the prompt audio itself also disambiguates them. See
+`BRAILLE_PREFIX[]` in `firmware/braille_tutor/braille_map.h` and the
+"Two-cell characters" section below for how the remote-mode sketches
+(`t10_learning`, `t11_testing`, `t11_ml_test`) teach and test this.
 
-Drop images into `braille_img/` — one Braille cell per image, any of
-webp/png/jpg — add their filenames to `tools/braille_aliases.json`, then:
+### Re-verifying or re-deriving the map
+
+If you ever need to re-check a pattern against a reference image:
 
 ```bash
 python3 tools/import_braille_images.py           # dry run: shows what would change
@@ -92,26 +100,8 @@ deliberate: your `uu.webp` is উ, which this project calls `u`, while your
 `uuuu.webp` is ঊ, which it calls `uu`. The literal string `uu` means different
 letters in the two schemes, so any fallback name matching would put one
 letter's pattern on another — producing a map that passes every structural
-check while being wrong. The alias table is the only lookup path.
-
-### What "verified" changes
-
-- **Per-row provenance.** `braille_map_verified` records whether *that row's
-  character* was verified, not whether the whole map was. Rows for the 11
-  vowels are usable now; you can filter at training time instead of throwing
-  away whole sessions.
-- **The app** shows "verified for N of 50" and tags an individual prompt when
-  that character is still a placeholder.
-- **The firmware** exposes `BRAILLE_VERIFIED[id]` and stamps each SD row the
-  same way.
-
-### One known collision
-
-Corrected ঋ = `[1,2,3,5]`, which equals the **unverified placeholder** for
-র (ra). Two letters cannot share a pattern. Since র's value is itself a guess,
-this most likely resolves when you supply `ra.webp`. The tooling reports it as
-a warning rather than an error — a clash between two *verified* letters would
-be a hard failure and blocks the import.
+check while being wrong. The alias table (`tools/braille_aliases.json`) is the
+only lookup path.
 
 ---
 
@@ -222,8 +212,8 @@ ESP32-WROOM-32 · DFPlayer Mini + 3 W speaker · **ULN2803A** · 6 coin motors �
 | Function | GPIO |
 |---|---|
 | Buttons 1–6 (dots) | 32, 33, 25, 26, 27, 14 |
-| Submit | 34 *(input-only — needs an external 10 kΩ pull-up to 3V3)* |
-| Motors 1–6 → ULN2803A | 13, 4, 21, 22, 2, 15 |
+| Submit | 12 *(strapping pin — must read LOW at boot; a switch to GND is safe here, see `pins.h`)* |
+| Motors 1–6 → ULN2803A | 21, 13, 22, 2, 15, 4 *(verified against physical wiring — do not "correct" this back to a sequential-looking order)* |
 | DFPlayer (UART2) | 16 RX, 17 TX |
 | microSD (VSPI) | 18 CLK, 19 MISO, 23 MOSI, 5 CS |
 
@@ -255,6 +245,83 @@ features the model consumes. Firmware handles this honestly rather than silently
 without an RTC it advances a persisted epoch by a **declared assumption** and
 stamps every row `rtc_present=0`, so those rows stay auditable. A DS3231 costs
 about $2 and removes the problem. Set `USE_RTC 1` in `pins.h` after wiring it.
+
+---
+
+## Remote / cloud-connected mode — teacher panel
+
+`braille_tutor.ino` is deliberately WiFi-free, so the pieces below are a
+**separate, parallel mode**: a teacher controls the board from a phone or
+laptop anywhere with internet, over WiFi + Supabase, instead of the offline
+on-device model. Nothing here replaces the offline track above — pick
+whichever mode fits the session.
+
+### The pieces
+
+| Piece | What it does | Where |
+|---|---|---|
+| Teacher panel (web UI) | Pick Learn or Test mode, select letters, watch results live | `web/teacher.html` + `web/teacher.js` |
+| Single-letter remote | Minimal page: pick one letter, send it | `web/remote_control.html` |
+| **t10_learning** | Teach mode: audio + motor vibration teaches the pattern, retries until correct, reports every attempt | `firmware/tests/t10_learning/` |
+| **t11_testing** | Assessment mode: audio only (no vibration cue), one attempt per letter, no retry, prints a batch summary to Serial when the teacher's whole selection is done | `firmware/tests/t11_testing/` |
+| **t11_ml_test** | Same flow as t10_learning, but also runs the on-device ML model side-by-side with the rule engine and logs the model's decision (not a placeholder) to Supabase, so you can inspect MATCH/MISMATCH cases | `firmware/t11_ml_test/` |
+
+Only flash **one** of `t10_learning` / `t11_testing` / `t11_ml_test` at a time
+— whichever the teacher panel's current tab needs (শেখানো → t10_learning or
+t11_ml_test, পরীক্ষা → t11_testing).
+
+### How data moves
+
+There is no direct connection between the browser and the ESP32 — everything
+relays through two Supabase tables, polled (not pushed) by both sides:
+
+```
+[Teacher selects letters, clicks Start]
+        │  INSERT
+        ▼
+  remote_commands   { device_id, letter_id, command: "play"|"test",
+                       test_index, test_total }
+        │  polled by the ESP32 every ~250 ms
+        ▼
+  ESP32 plays audio (+ vibration in Learn mode), waits for the
+  physical dot buttons + SUBMIT -- there is no web input path
+        │  INSERT
+        ▼
+  attempts   { char_id, entered_pattern, expected_pattern, is_correct,
+               response_time, retry_count, teaching_action,
+               confidence_state, source: "esp32", ... }
+        │  polled by the browser every ~200 ms
+        ▼
+  Teacher panel shows the result live and sends the next letter.
+  After the last letter in a Test run: test_sessions + student_weaknesses
+  get written too, for the results screen and per-letter mastery dots.
+```
+
+`test_index`/`test_total` on `remote_commands` are how the ESP32 knows its
+position in the teacher's batch and when to print the final score to Serial
+— they're only set for `command: "test"` rows.
+
+### One-time setup
+
+```bash
+# 1. paste supabase/full_setup.sql into the Supabase SQL editor and run it
+#    (creates/updates remote_commands, attempts, test_sessions, student_weaknesses)
+# 2. per sketch you plan to flash, open its secrets.h and fill in your real
+#    WIFI_SSID / WIFI_PASS -- e.g. firmware/tests/t10_learning/secrets.h
+```
+
+**Never commit a `secrets.h` with real credentials.** Every sketch's
+`secrets.h` is already gitignored (see `.gitignore`) — if you add a new
+remote-mode sketch, add its `secrets.h` path there too before filling in
+real values.
+
+### Two-cell characters (ঋ, ৎ)
+
+ঋ and ৎ can't be told apart from other letters that share their main dot
+pattern by feel alone, so they're taught/tested as two cells: a short
+**prefix** vibration (dot 5), then the answer cell. `data/braille_map.json`'s
+`cells` field and `firmware/braille_tutor/braille_map.h`'s `BRAILLE_PREFIX[]`
+are the source of truth — `0` means single-cell, matching every other letter.
 
 ---
 
@@ -292,13 +359,19 @@ today. Every figure in it is checked against the source data.
 ```
 spec/engine_spec.json        ⭐ 14 features, thresholds, normalization
 data/braille_map.json        ⭐ 50 letters → dot patterns + per-letter verified
-braille_img/                 your reference cell images (11 vowels so far)
+braille_img/                 reference cell images used to verify the map
 tools/braille_aliases.json   filename → letter, the ONLY lookup path
 assets/braille/              generated SVG + PNG + contact sheet
-web/                         MVP app (rule_engine.js is GENERATED)
+web/                         MVP data-collection app (rule_engine.js is GENERATED)
+web/teacher.html, teacher.js remote teacher panel -- Learn/Test over Supabase
+web/remote_control.html      minimal single-letter remote sender
 tools/                       generators, dataset, training, tests
-firmware/braille_tutor/      main sketch (3 headers are GENERATED)
-firmware/tests/              staged bring-up sketches t1..t6
-supabase/schema.sql          attempts table + monitoring views
+firmware/braille_tutor/      main OFFLINE sketch (3 headers are GENERATED)
+firmware/tests/              staged bring-up sketches t1..t9, plus the
+                              remote-mode sketches t7_cloud_dot, t8_cloud_quiz,
+                              t10_learning, t11_testing (see README.md there)
+firmware/t11_ml_test/        remote learning + on-device ML vs rule-engine log
+supabase/full_setup.sql      ⭐ single idempotent migration -- run this one
+supabase/schema.sql          original attempts-table-only schema (superseded)
 sd_card/mp3/                 audio, ready to copy to the card
 ```
