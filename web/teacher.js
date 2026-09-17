@@ -605,7 +605,7 @@ async function simSubmit() {
     teaching_action: ta, confidence_state: cs,
     expected_pattern: expected, entered_pattern: entered,
     is_correct, press_order: '[]',
-    source: 'simulator', is_synthetic: false, spec_version: 2, braille_map_verified: true,
+    source: 'web', is_synthetic: false, spec_version: 2, braille_map_verified: true,
     created_at: new Date().toISOString(),
   });
 

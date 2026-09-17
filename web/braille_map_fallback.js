@@ -810,3 +810,5 @@ window.BRAILLE_MAP_FALLBACK = {
   ],
   "verified_count": 50
 };
+
+export const FALLBACK_MAP = window.BRAILLE_MAP_FALLBACK;
