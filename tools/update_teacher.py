@@ -1,0 +1,1532 @@
+# -*- coding: utf-8 -*-
+"""Update web/teacher.html with full real-time ESP32 sync, decision engine, dynamic hints, and auto-advance."""
+
+html_content = r'''<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>স্মার্ট শিক্ষক — সহজ পাঠ ও রিয়েল-টাইম কন্ট্রোল</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --primary: #10b981;
+    --primary-dark: #059669;
+    --primary-light: #ecfdf5;
+    --primary-border: #a7f3d0;
+    --danger: #ef4444;
+    --danger-light: #fef2f2;
+    --danger-border: #fecaca;
+    --amber: #f59e0b;
+    --amber-light: #fffbeb;
+    --amber-border: #fde68a;
+    --border: #e2e8f0;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 10px;
+    --shadow-soft: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+    --shadow-float: 0 12px 32px -4px rgba(16, 185, 129, 0.2);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text-main);
+    font-family: 'Hind Siliguri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  /* Mobile App Shell */
+  .mobile-container {
+    width: 100%;
+    max-width: 480px;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-bottom: 84px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Header */
+  header.app-bar {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .app-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.01em;
+  }
+  .device-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .dot-pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
+
+  /* Screen Views */
+  .screen-view {
+    display: none;
+    padding: 8px 20px 24px;
+    animation: fadeIn 0.18s ease-out;
+  }
+  .screen-view.active {
+    display: block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Pill Mode Selector */
+  .mode-selector {
+    display: flex;
+    background: #e2e8f0;
+    padding: 4px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+    gap: 4px;
+  }
+  .mode-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .mode-btn.active {
+    background: var(--card);
+    color: var(--text-main);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Center Hero Card */
+  .hero-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .hero-card.success-glow {
+    border-color: var(--primary);
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
+  }
+  .hero-card.error-glow {
+    border-color: var(--danger);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.2);
+  }
+
+  .lesson-sublabel {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .giant-letter {
+    font-size: 100px;
+    font-weight: 700;
+    line-height: 1;
+    color: #1e293b;
+    margin: 4px 0 12px;
+    user-select: none;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .braille-preview {
+    font-size: 18px;
+    color: var(--primary-dark);
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
+    padding: 4px 14px;
+    border-radius: 999px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+  }
+  .audio-trigger {
+    border: 1px solid var(--border);
+    background: #f1f5f9;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .audio-trigger:hover { background: #e2e8f0; }
+
+  /* Live Decision / Hint Box */
+  .decision-hint-box {
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13.5px;
+    line-height: 1.5;
+    display: none;
+    animation: fadeIn 0.2s ease;
+    text-align: left;
+  }
+  .decision-hint-box.show { display: block; }
+  .decision-hint-box.correct {
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
+    color: #065f46;
+  }
+  .decision-hint-box.hint {
+    background: var(--amber-light);
+    border: 1px solid var(--amber-border);
+    color: #92400e;
+  }
+
+  /* Hardware Input Pad Simulator */
+  .hardware-pad-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow-soft);
+  }
+  .pad-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 12px;
+  }
+  .dot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-width: 220px;
+    margin: 0 auto 14px;
+  }
+  .dot-btn {
+    height: 48px;
+    background: #f1f5f9;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.12s;
+  }
+  .dot-btn:active { transform: scale(0.94); }
+  .dot-btn.active {
+    background: #3b82f6;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  }
+  .submit-row {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-submit-hw {
+    flex: 2;
+    background: #1e293b;
+    color: #fff;
+    border: none;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-submit-hw:active { background: #0f172a; }
+  .btn-clear-hw {
+    flex: 1;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Auto Advance Toggle */
+  .auto-advance-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f1f5f9;
+    padding: 8px 14px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #475569;
+  }
+  .switch-toggle {
+    position: relative;
+    width: 38px;
+    height: 22px;
+  }
+  .switch-toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1; border-radius: 34px; transition: .2s;
+  }
+  .slider:before {
+    position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+    background-color: white; border-radius: 50%; transition: .2s;
+  }
+  input:checked + .slider { background-color: var(--primary); }
+  input:checked + .slider:before { transform: translateX(16px); }
+
+  /* Progress Bar Minimal */
+  .progress-section {
+    margin: 14px 4px 20px;
+  }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .progress-track {
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  /* Action Buttons */
+  .action-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .btn-primary {
+    width: 100%;
+    background: var(--primary);
+    color: #ffffff;
+    border: none;
+    padding: 15px 20px;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-float);
+    transition: transform 0.1s, background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
+  .btn-secondary {
+    width: 100%;
+    background: var(--card);
+    color: #475569;
+    border: 1px solid var(--border);
+    padding: 13px 20px;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-secondary:hover { background: #f1f5f9; }
+  .btn-danger-outline {
+    border-color: var(--danger-border);
+    color: #dc2626;
+  }
+  .btn-danger-outline:hover { background: var(--danger-light); }
+
+  /* Alphabet Grid Picker */
+  .picker-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .random-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f1f5f9;
+    padding: 16px 20px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+  }
+  .random-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .random-letter-preview {
+    font-size: 40px;
+    font-weight: 700;
+    color: #1e293b;
+    background: #fff;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .filter-pills {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+    scrollbar-width: none;
+  }
+  .filter-pills::-webkit-scrollbar { display: none; }
+  .filter-pill {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: var(--text-muted);
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .filter-pill.active {
+    background: #1e293b;
+    color: #fff;
+  }
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    max-height: 290px;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .char-tile {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    font-size: 22px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.12s ease;
+  }
+  .char-tile:active { transform: scale(0.92); }
+  .char-tile.selected {
+    border: 2px solid var(--primary);
+    background: var(--primary-light);
+    color: #065f46;
+    font-weight: 700;
+  }
+  .char-tile.mastered::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--primary);
+    border-radius: 50%;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+  }
+
+  /* Quiz Strip */
+  .quiz-metrics {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .metric-icon { font-size: 20px; }
+  .metric-info .lbl { font-size: 11.5px; color: var(--text-muted); }
+  .metric-info .val { font-size: 16px; font-weight: 700; color: var(--text-main); }
+
+  /* Results Screen */
+  .result-score-circle {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 8px solid var(--primary-light);
+    border-top-color: var(--primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 10px auto 18px;
+  }
+  .result-score-circle .pct {
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1;
+  }
+  .result-score-circle .sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .answer-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .chip-ok {
+    background: var(--primary-light);
+    color: #065f46;
+    border: 1px solid var(--primary-border);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .chip-err {
+    background: var(--danger-light);
+    color: #991b1b;
+    border: 1px solid var(--danger-border);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: 6px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Analytics Chart */
+  .chart-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .chart-svg {
+    width: 100%;
+    height: 140px;
+    overflow: visible;
+  }
+
+  /* Bottom Navigation */
+  nav.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    max-width: 480px;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0 10px;
+    z-index: 30;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 4px 12px;
+    border-radius: 999px;
+    transition: color 0.15s;
+  }
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+  .nav-item.active {
+    color: var(--primary-dark);
+  }
+  .nav-item.active svg {
+    stroke: var(--primary-dark);
+  }
+</style>
+</head>
+<body>
+
+<div class="mobile-container">
+
+  <!-- Sticky Header -->
+  <header class="app-bar">
+    <div class="app-title" id="appHeaderTitle">সহজ পাঠ</div>
+    <div class="device-pill" id="deviceStatusPill" title="ডিভাইস পরিবর্তন বা সংযোগ টেস্ট করতে ক্লিক করুন">
+      <span class="dot-pulse"></span>
+      <span id="deviceLabel">ESP32 সংযুক্ত</span>
+    </div>
+  </header>
+
+  <!-- SCREEN 1: সহজ পাঠ (Learn Mode) -->
+  <main class="screen-view active" id="viewLearn">
+    
+    <!-- Mode Switcher -->
+    <div class="mode-selector">
+      <button class="mode-btn active" id="btnModeSeq" onclick="setLearnMode('seq')">ক্রমানুসারে (১, ২, ৩...)</button>
+      <button class="mode-btn" id="btnModeRand" onclick="setLearnMode('rand')">এলোমেলো (Random)</button>
+    </div>
+
+    <!-- Center Hero Card -->
+    <div class="hero-card" id="heroCard">
+      <div class="lesson-sublabel">বর্তমান পাঠ্য বর্ণ (Current Letter)</div>
+      <div class="giant-letter" id="currentHeroChar">অ</div>
+      <div class="braille-preview" id="brailleDotPattern">ব্রেইল: [১] • ⠁</div>
+      <button class="audio-trigger" onclick="playCurrentAudio()">
+        🔊 উচ্চারণ শুনুন
+      </button>
+
+      <!-- Live Dynamic Decision & Hint Box -->
+      <div class="decision-hint-box" id="decisionHintBox">
+        <!-- Injected via JS based on evaluation -->
+      </div>
+    </div>
+
+    <!-- Auto Advance Toggle -->
+    <div class="auto-advance-bar">
+      <span>সঠিক হলে সরাসরি পরবর্তী বর্ণে যান ➔</span>
+      <label class="switch-toggle">
+        <input type="checkbox" id="autoAdvanceToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Hardware Input Pad (Student ESP32 Receiver / Simulator) -->
+    <div class="hardware-pad-card">
+      <div class="pad-header">
+        <span>🎮 শিক্ষার্থী ইনপুট প্যাড (ESP32 বোতাম)</span>
+        <span id="hwPadStatus" style="font-size: 11.5px; color: var(--primary-dark);">লাইভ প্রস্তুত</span>
+      </div>
+      
+      <!-- 6-Dot Braille Grid representing ESP32 Hardware Buttons -->
+      <div class="dot-grid">
+        <button class="dot-btn" id="btnDot1" onclick="toggleDot(1)">ডট ১</button>
+        <button class="dot-btn" id="btnDot4" onclick="toggleDot(4)">ডট ৪</button>
+        <button class="dot-btn" id="btnDot2" onclick="toggleDot(2)">ডট ২</button>
+        <button class="dot-btn" id="btnDot5" onclick="toggleDot(5)">ডট ৫</button>
+        <button class="dot-btn" id="btnDot3" onclick="toggleDot(3)">ডট ৩</button>
+        <button class="dot-btn" id="btnDot6" onclick="toggleDot(6)">ডট ৬</button>
+      </div>
+
+      <div class="submit-row">
+        <button class="btn-submit-hw" onclick="submitStudentInput()">
+          জমা দিন (Submit Button) ↵
+        </button>
+        <button class="btn-clear-hw" onclick="clearDots()">
+          ক্লিয়ার
+        </button>
+      </div>
+    </div>
+
+    <!-- Minimal Progress Section -->
+    <div class="progress-section">
+      <div class="progress-header">
+        <span id="learnProgressLabel">অগ্রগতি: ১ / ৫০</span>
+        <span id="learnProgressPct">২%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="learnProgressFill" style="width: 2%;"></div>
+      </div>
+    </div>
+
+    <!-- Primary Action Controls -->
+    <div class="action-stack">
+      <button class="btn-primary" onclick="nextLetter(true)">
+        পরবর্তী বর্ণ ➔
+      </button>
+      <button class="btn-secondary btn-danger-outline" onclick="stopSession()">
+        পাঠদান থামান
+      </button>
+    </div>
+
+  </main>
+
+  <!-- SCREEN 2: বর্ণ নির্বাচন (Alphabet & Number Grid Picker) -->
+  <main class="screen-view" id="viewPicker">
+    
+    <!-- Random Generator Hero -->
+    <div class="picker-card" style="padding: 16px;">
+      <div class="random-hero">
+        <div class="random-left">
+          <div class="random-letter-preview" id="pickerRandomPreview">গ</div>
+          <div>
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">র‍্যান্ডম নির্বাচন</div>
+            <div style="font-size: 15px; font-weight: 700;">বাংলা ব্যঞ্জনবর্ণ</div>
+          </div>
+        </div>
+        <button class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 14px; box-shadow: none;" onclick="pickRandomLetter()">
+          🎲 বদলান
+        </button>
+      </div>
+
+      <!-- Quick Action: Send to ESP -->
+      <button class="btn-primary" style="margin-bottom: 6px;" onclick="sendSelectedToESP()">
+        যন্ত্রে পাঠান ও প্র্যাকটিস করান ➔
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-pills">
+      <button class="filter-pill active" onclick="filterCategory('all', this)">সব (৫০)</button>
+      <button class="filter-pill" onclick="filterCategory('vowel', this)">স্বরবর্ণ (১১)</button>
+      <button class="filter-pill" onclick="filterCategory('consonant', this)">ব্যঞ্জনবর্ণ (৩৯)</button>
+      <button class="filter-pill" onclick="filterCategory('digit', this)">সংখ্যা (১০)</button>
+    </div>
+
+    <!-- Grid -->
+    <div class="picker-card" style="padding: 12px;">
+      <div style="font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px;">
+        বর্ণে ট্যাপ করে বেছে নিন:
+      </div>
+      <div class="char-grid" id="alphabetGrid"></div>
+    </div>
+
+  </main>
+
+  <!-- SCREEN 3: সহজ পরীক্ষা (Live Quiz Mode) -->
+  <main class="screen-view" id="viewQuiz">
+    
+    <!-- Minimal Quiz Stats -->
+    <div class="quiz-metrics">
+      <div class="metric-card">
+        <div class="metric-icon">🎯</div>
+        <div class="metric-info">
+          <div class="lbl">বর্তমান প্রশ্ন</div>
+          <div class="val" id="quizQuestionIdx">প্রশ্ন ৪/১০</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">⏱️</div>
+        <div class="metric-info">
+          <div class="lbl">সময় বাকি</div>
+          <div class="val" id="quizTimer">০৯ সে.</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">⭐</div>
+        <div class="metric-info">
+          <div class="lbl">স্কোর</div>
+          <div class="val" id="quizLiveScore">৩/৪</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Target Hero Card -->
+    <div class="hero-card">
+      <div class="lesson-sublabel">যন্ত্রে এই বর্ণটি চাপুন</div>
+      <div class="giant-letter" id="quizTargetChar">খ</div>
+      <button class="audio-trigger" onclick="playCurrentAudio()">
+        🔊 উচ্চারণ শুনুন
+      </button>
+
+      <!-- Live ESP32 Response feedback -->
+      <div class="decision-hint-box correct show" id="quizFeedbackBadge" style="text-align: center;">
+        ✓ যন্ত্রে ইনপুটের অপেক্ষায়...
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-stack">
+      <button class="btn-primary" onclick="nextQuizQuestion()">
+        পরবর্তী প্রশ্ন (র‍্যান্ডম) ➔
+      </button>
+      <button class="btn-secondary btn-danger-outline" onclick="endQuizEarly()">
+        পরীক্ষা শেষ করুন
+      </button>
+    </div>
+
+  </main>
+
+  <!-- SCREEN 4: ফলাফল ও মূল্যায়ন (Quiz Result Summary) -->
+  <main class="screen-view" id="viewResult">
+    
+    <div class="hero-card" style="padding-top: 24px;">
+      <div class="lesson-sublabel">তানভীর আহমেদ • রোল: ০৪</div>
+      
+      <!-- Score circle -->
+      <div class="result-score-circle">
+        <span class="pct" id="resPercent">৮০%</span>
+        <span class="sub" id="resFraction">৮ / ১০ টি সঠিক</span>
+      </div>
+
+      <div style="font-size: 15px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px;">
+        🌟 চমৎকার পারফরম্যান্স!
+      </div>
+
+      <!-- Quick stats -->
+      <div style="display: flex; gap: 18px; font-size: 13px; color: var(--text-muted); font-weight: 500;">
+        <span>মোট সময়: ০২:১৫ মি.</span>
+        <span>•</span>
+        <span>গড় গতি: ১.২ সে.</span>
+      </div>
+    </div>
+
+    <!-- Breakdown Card -->
+    <div class="picker-card">
+      <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 6px;">সঠিক উত্তরসমূহ (৮টি):</div>
+      <div class="answer-chips" id="resCorrectChips">
+        <span class="chip-ok">ক ✓</span>
+        <span class="chip-ok">খ ✓</span>
+        <span class="chip-ok">গ ✓</span>
+        <span class="chip-ok">ঘ ✓</span>
+        <span class="chip-ok">চ ✓</span>
+        <span class="chip-ok">ছ ✓</span>
+        <span class="chip-ok">জ ✓</span>
+        <span class="chip-ok">ঝ ✓</span>
+      </div>
+
+      <div style="font-size: 13.5px; font-weight: 700; margin: 16px 0 8px;">ত্রুটি বিশ্লেষণ (২টি):</div>
+      <div id="resErrorList">
+        <div class="chip-err">
+          <span><strong>বর্ণ 'ঙ':</strong> ভুল ইনপুট 'গ' (বাটন ত্রুটি)</span>
+          <span style="font-size: 11px; font-weight: 700; color: #dc2626;">রিভিউ প্রয়োজন</span>
+        </div>
+        <div class="chip-err">
+          <span><strong>বর্ণ 'ঞ':</strong> ইনপুট 'জ' এসেছে</span>
+          <span style="font-size: 11px; font-weight: 700; color: #dc2626;">রিভিউ প্রয়োজন</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-stack">
+      <button class="btn-primary" onclick="restartQuiz()">
+        পুনরায় পরীক্ষা নিন 🔄
+      </button>
+      <button class="btn-secondary" onclick="switchTab('viewLearn', 'সহজ পাঠ')">
+        হোমে ফিরে যান
+      </button>
+      <button class="btn-secondary" style="border: none; color: var(--primary-dark);" onclick="shareReport()">
+        অভিভাবককে রিপোর্ট পাঠান 📲
+      </button>
+    </div>
+
+  </main>
+
+  <!-- SCREEN 5: শিক্ষার্থীর অগ্রগতি (Student Profile & Analytics) -->
+  <main class="screen-view" id="viewProgress">
+    
+    <!-- Profile Summary Card -->
+    <div class="hero-card" style="padding: 20px; align-items: stretch; text-align: left;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <div>
+          <div style="font-size: 17px; font-weight: 700;">তানভীর আহমেদ</div>
+          <div style="font-size: 12px; color: var(--text-muted); font-weight: 500;">রোল: ০৪ • শ্রেণি: নার্সারি - ক</div>
+        </div>
+        <button class="filter-pill" style="background: var(--primary-light); color: var(--primary-dark);" onclick="exportReportPDF()">
+          রিপোর্ট 📄
+        </button>
+      </div>
+
+      <div style="display: flex; justify-content: space-around; background: #f8fafc; padding: 12px; border-radius: var(--radius-sm); text-align: center;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">মোট সেশন</div>
+          <div style="font-size: 16px; font-weight: 700;">২৪টি</div>
+        </div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">গড় নির্ভুলতা</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--primary-dark);">৮৬%</div>
+        </div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">গড় গতি</div>
+          <div style="font-size: 16px; font-weight: 700;">১.১ সে.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Smooth Line Chart -->
+    <div class="chart-box">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 14px; font-weight: 700;">সাপ্তাহিক নির্ভুলতার গ্রাফ</span>
+        <span style="font-size: 12px; color: var(--primary-dark); font-weight: 600;">+১২% উন্নতি 📈</span>
+      </div>
+
+      <!-- Minimal SVG Line Chart -->
+      <svg class="chart-svg" viewBox="0 0 320 120">
+        <defs>
+          <linearGradient id="gradEmerald" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+        <line x1="20" y1="20" x2="300" y2="20" stroke="#f1f5f9" stroke-width="1.5" />
+        <line x1="20" y1="55" x2="300" y2="55" stroke="#f1f5f9" stroke-width="1.5" />
+        <line x1="20" y1="90" x2="300" y2="90" stroke="#f1f5f9" stroke-width="1.5" />
+
+        <path d="M 30,85 C 80,78 120,62 170,50 C 220,40 260,28 290,22 L 290,105 L 30,105 Z" fill="url(#gradEmerald)" />
+        <path d="M 30,85 C 80,78 120,62 170,50 C 220,40 260,28 290,22" fill="none" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" />
+
+        <circle cx="30" cy="85" r="4" fill="#10b981" />
+        <circle cx="95" cy="74" r="4" fill="#10b981" />
+        <circle cx="160" cy="53" r="4" fill="#10b981" />
+        <circle cx="225" cy="38" r="4" fill="#10b981" />
+        <circle cx="290" cy="22" r="5" fill="#059669" stroke="#fff" stroke-width="2" />
+
+        <text x="30" y="116" font-size="11" fill="#94a3b8" text-anchor="middle">রবি (৭০%)</text>
+        <text x="95" y="116" font-size="11" fill="#94a3b8" text-anchor="middle">সোম (৭৫%)</text>
+        <text x="160" y="116" font-size="11" fill="#94a3b8" text-anchor="middle">বুধ (৮২%)</text>
+        <text x="225" y="116" font-size="11" fill="#94a3b8" text-anchor="middle">বৃহ (৮৬%)</text>
+        <text x="290" y="116" font-size="11" fill="#059669" font-weight="700" text-anchor="middle">শুক্র (৯১%)</text>
+      </svg>
+    </div>
+
+    <!-- Weak Letters / Needs Practice -->
+    <div class="picker-card">
+      <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 6px;">আরও চর্চা প্রয়োজন (৫টি বর্ণ):</div>
+      <div class="answer-chips">
+        <span class="chip-ok" style="background:#fee2e2; color:#991b1b; border-color:#fecaca;">ঙ (৩ বার ভুল)</span>
+        <span class="chip-ok" style="background:#fee2e2; color:#991b1b; border-color:#fecaca;">ঋ (২ বার ভুল)</span>
+        <span class="chip-ok" style="background:#fee2e2; color:#991b1b; border-color:#fecaca;">ঞ</span>
+        <span class="chip-ok" style="background:#fee2e2; color:#991b1b; border-color:#fecaca;">ণ</span>
+        <span class="chip-ok" style="background:#fee2e2; color:#991b1b; border-color:#fecaca;">ঢ়</span>
+      </div>
+      <button class="btn-secondary" style="margin-top: 14px; font-size: 13px;" onclick="switchTab('viewPicker', 'বর্ণ নির্বাচন')">
+        এই বর্ণগুলোর বিশেষ পাঠ শুরু করুন ➔
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="navLearn" onclick="switchTab('viewLearn', 'সহজ পাঠ', this)">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span>পাঠদান</span>
+    </button>
+    <button class="nav-item" id="navPicker" onclick="switchTab('viewPicker', 'বর্ণ নির্বাচন', this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>বর্ণমালা</span>
+    </button>
+    <button class="nav-item" id="navQuiz" onclick="switchTab('viewQuiz', 'সহজ পরীক্ষা', this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>পরীক্ষা</span>
+    </button>
+    <button class="nav-item" id="navProgress" onclick="switchTab('viewProgress', 'শিক্ষার্থীর অগ্রগতি', this)">
+      <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      <span>অগ্রগতি</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- Audio Player Element -->
+<audio id="appAudioPlayer"></audio>
+
+<script>
+  // -------------------------------------------------------------------------
+  // Supabase & Device Integration
+  // -------------------------------------------------------------------------
+  const SUPABASE_URL = "https://rufaacgatrebsyxnyfbq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_lI3qv5Xk44GAhzL4R7I2GA_4k1aUar-";
+  let targetDeviceId = localStorage.getItem('teacher.device_id') || 'esp32_01';
+
+  const brailleMapUrl = './data/braille_map.json';
+  let letters = [];
+  let currentLetterIndex = 0;
+  let learnMode = 'seq'; // 'seq' or 'rand'
+  let isSessionActive = true;
+  let lastEvaluatedAttemptTime = null;
+
+  // Bengali digits for representation
+  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  function toBanglaNum(num) {
+    return String(num).split('').map(d => banglaDigits[parseInt(d)] || d).join('');
+  }
+
+  // Braille dot symbol generator
+  const brailleUnicodeOffset = 0x2800;
+  function getBrailleGlyph(dots) {
+    if (!dots || !dots.length) return '⠁';
+    let mask = 0;
+    dots.forEach(d => { mask |= (1 << (d - 1)); });
+    return String.fromCharCode(brailleUnicodeOffset + mask);
+  }
+
+  // Load Letters Map
+  async function initApp() {
+    try {
+      const res = await fetch(brailleMapUrl);
+      if (res.ok) {
+        const data = await res.json();
+        letters = data.letters;
+      }
+    } catch (e) {
+      console.warn("Falling back to local letters list");
+    }
+
+    if (!letters || letters.length === 0) {
+      letters = [
+        { id: 0, char: "অ", name: "a", category: "vowel", dots: [1], audio: "0001.mp3" },
+        { id: 1, char: "আ", name: "aa", category: "vowel", dots: [3, 4, 5], audio: "0002.mp3" },
+        { id: 2, char: "ই", name: "i", category: "vowel", dots: [2, 4], audio: "0003.mp3" },
+        { id: 3, char: "ঈ", name: "ii", category: "vowel", dots: [3, 5], audio: "0004.mp3" },
+        { id: 4, char: "উ", name: "u", category: "vowel", dots: [1, 3, 6], audio: "0005.mp3" },
+        { id: 5, char: "ঊ", name: "uu", category: "vowel", dots: [1, 2, 5, 6], audio: "0006.mp3" },
+        { id: 6, char: "ঋ", name: "ri", category: "vowel", dots: [1, 2, 3, 5], audio: "0007.mp3" },
+        { id: 7, char: "এ", name: "e", category: "vowel", dots: [1, 5], audio: "0008.mp3" },
+        { id: 8, char: "ঐ", name: "oi", category: "vowel", dots: [3, 4], audio: "0009.mp3" },
+        { id: 9, char: "ও", name: "o", category: "vowel", dots: [1, 3, 5], audio: "0010.mp3" },
+        { id: 10, char: "ঔ", name: "ou", category: "vowel", dots: [2, 4, 6], audio: "0011.mp3" },
+        { id: 11, char: "ক", name: "ka", category: "consonant", dots: [1, 3], audio: "0012.mp3" },
+        { id: 12, char: "খ", name: "kha", category: "consonant", dots: [4, 6], audio: "0013.mp3" },
+        { id: 13, char: "গ", name: "ga", category: "consonant", dots: [1, 2, 4, 5], audio: "0014.mp3" },
+        { id: 14, char: "ঘ", name: "gha", category: "consonant", dots: [1, 2, 6], audio: "0015.mp3" },
+        { id: 15, char: "ঙ", name: "nga", category: "consonant", dots: [3, 4, 6], audio: "0016.mp3" },
+        { id: 16, char: "চ", name: "ca", category: "consonant", dots: [1, 4], audio: "0017.mp3" },
+        { id: 17, char: "ছ", name: "cha", category: "consonant", dots: [1, 6], audio: "0018.mp3" },
+        { id: 18, char: "জ", name: "ja", category: "consonant", dots: [2, 4, 5], audio: "0019.mp3" },
+        { id: 19, char: "ঝ", name: "jha", category: "consonant", dots: [3, 5, 6], audio: "0020.mp3" },
+        { id: 20, char: "ঞ", name: "nya", category: "consonant", dots: [2, 5], audio: "0021.mp3" }
+      ];
+    }
+
+    renderCurrentLetter(true);
+    renderAlphabetGrid('all');
+    renderQuizQuestion();
+
+    // Start background listener for real ESP32 attempts from Supabase
+    startHardwarePolling();
+  }
+
+  // -------------------------------------------------------------------------
+  // Learning Mode Controls
+  // -------------------------------------------------------------------------
+  function setLearnMode(mode) {
+    learnMode = mode;
+    document.getElementById('btnModeSeq').classList.toggle('active', mode === 'seq');
+    document.getElementById('btnModeRand').classList.toggle('active', mode === 'rand');
+  }
+
+  function renderCurrentLetter(shouldPlaySound = true) {
+    const item = letters[currentLetterIndex];
+    if (!item) return;
+
+    document.getElementById('currentHeroChar').textContent = item.char;
+    const glyph = getBrailleGlyph(item.dots);
+    document.getElementById('brailleDotPattern').textContent = `ব্রেইল: [${item.dots.join(',')}] • ${glyph}`;
+    
+    // Reset decision box and hero card styling
+    const heroCard = document.getElementById('heroCard');
+    heroCard.classList.remove('success-glow', 'error-glow');
+    const decisionBox = document.getElementById('decisionHintBox');
+    decisionBox.className = 'decision-hint-box';
+    decisionBox.innerHTML = '';
+
+    // Clear hardware input simulator dots
+    clearDots();
+
+    // Update Progress
+    const total = letters.length;
+    const cur = currentLetterIndex + 1;
+    const pct = Math.round((cur / total) * 100);
+    document.getElementById('learnProgressLabel').textContent = `অগ্রগতি: ${toBanglaNum(cur)} / ${toBanglaNum(total)}`;
+    document.getElementById('learnProgressPct').textContent = `${toBanglaNum(pct)}%`;
+    document.getElementById('learnProgressFill').style.width = `${pct}%`;
+
+    // 1. Play audio pronunciation immediately so student hears the letter!
+    if (shouldPlaySound) {
+      playCurrentAudio();
+    }
+
+    // 2. Send remote command to ESP32 to vibrate dots
+    sendRemoteCommand(item.id);
+  }
+
+  function nextLetter(shouldPlaySound = true) {
+    if (learnMode === 'seq') {
+      currentLetterIndex = (currentLetterIndex + 1) % letters.length;
+    } else {
+      currentLetterIndex = Math.floor(Math.random() * letters.length);
+    }
+    renderCurrentLetter(shouldPlaySound);
+  }
+
+  function stopSession() {
+    isSessionActive = !isSessionActive;
+    const btn = event.target;
+    const decisionBox = document.getElementById('decisionHintBox');
+    if (!isSessionActive) {
+      btn.textContent = 'পাঠদান পুনরায় শুরু করুন ▶';
+      btn.style.color = 'var(--primary-dark)';
+      btn.style.borderColor = 'var(--primary-border)';
+      decisionBox.className = 'decision-hint-box hint show';
+      decisionBox.innerHTML = `⏸️ <strong>পাঠদান সাময়িক স্থগিত রয়েছে।</strong> পুনরায় চালু করতে বোতাম চাপুন।`;
+    } else {
+      btn.textContent = 'পাঠদান থামান';
+      btn.style.color = '#dc2626';
+      btn.style.borderColor = 'var(--danger-border)';
+      renderCurrentLetter(true);
+    }
+  }
+
+  function playCurrentAudio() {
+    const item = letters[currentLetterIndex];
+    if (!item || !item.audio) return;
+    const audio = document.getElementById('appAudioPlayer');
+    audio.src = `audio/${item.audio}`;
+    audio.play().catch(() => {});
+  }
+
+  function playSoundFile(filename) {
+    const audio = document.getElementById('appAudioPlayer');
+    audio.src = `audio/${filename}`;
+    audio.play().catch(() => {});
+  }
+
+  // -------------------------------------------------------------------------
+  // Core Decision Engine & Real-Time Sync (Evaluate Student Input)
+  // -------------------------------------------------------------------------
+  let activeDotMask = 0; // bitmask for dots 1-6
+
+  function toggleDot(dotNum) {
+    const btn = document.getElementById(`btnDot${dotNum}`);
+    const bit = 1 << (dotNum - 1);
+    if (activeDotMask & bit) {
+      activeDotMask &= ~bit;
+      btn.classList.remove('active');
+    } else {
+      activeDotMask |= bit;
+      btn.classList.add('active');
+    }
+  }
+
+  function clearDots() {
+    activeDotMask = 0;
+    for (let i = 1; i <= 6; i++) {
+      const btn = document.getElementById(`btnDot${i}`);
+      if (btn) btn.classList.remove('active');
+    }
+  }
+
+  // Convert bitmask to array of pressed dots [1, 3] etc.
+  function maskToDotsArray(mask) {
+    const arr = [];
+    for (let i = 1; i <= 6; i++) {
+      if (mask & (1 << (i - 1))) arr.push(i);
+    }
+    return arr;
+  }
+
+  function submitStudentInput() {
+    const enteredDots = maskToDotsArray(activeDotMask);
+    evaluateSubmission(enteredDots);
+  }
+
+  function evaluateSubmission(enteredDots) {
+    const currentItem = letters[currentLetterIndex];
+    if (!currentItem) return;
+
+    const expectedDots = currentItem.dots.slice().sort();
+    const studentDots = enteredDots.slice().sort();
+
+    // Exact match check
+    const isCorrect = expectedDots.length === studentDots.length &&
+                      expectedDots.every((d, idx) => d === studentDots[idx]);
+
+    const heroCard = document.getElementById('heroCard');
+    const decisionBox = document.getElementById('decisionHintBox');
+    const autoAdvance = document.getElementById('autoAdvanceToggle').checked;
+
+    if (isCorrect) {
+      // -----------------------------------------------------------------------
+      // CORRECT CASE:
+      // 1. Success glow and affirmative feedback
+      // 2. Play success sound (0051.mp3 -> "সঠিক")
+      // 3. Instantly/Smoothly advance to NEXT letter
+      // -----------------------------------------------------------------------
+      heroCard.classList.remove('error-glow');
+      heroCard.classList.add('success-glow');
+
+      decisionBox.className = 'decision-hint-box correct show';
+      decisionBox.innerHTML = `
+        <div style="font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          ✓ সঠিক উত্তর! চমৎকার!
+        </div>
+        <div style="font-size: 12.5px; margin-top: 2px;">
+          ইনপুট: [${studentDots.join(', ')}] • নির্ভুল সনাক্তকরণ (ESP32)
+        </div>
+      `;
+
+      // Play "সঠিক" audio prompt
+      playSoundFile('0051.mp3');
+
+      // Auto Advance to Next Letter after 1 second!
+      if (autoAdvance) {
+        decisionBox.innerHTML += `<div style="font-size: 12px; color: var(--primary-dark); font-weight: 600; margin-top: 4px;">পরবর্তী বর্ণে যাওয়া হচ্ছে... ➔</div>`;
+        setTimeout(() => {
+          if (isSessionActive) {
+            nextLetter(true);
+          }
+        }, 1100);
+      }
+
+    } else {
+      // -----------------------------------------------------------------------
+      // INCORRECT CASE:
+      // 1. Decision engine detects missing and extra dots
+      // 2. Plays error sound (0052.mp3 -> "ভুল")
+      // 3. Shows smart Bengali hint advice
+      // 4. Stays on current letter to allow retry
+      // -----------------------------------------------------------------------
+      heroCard.classList.remove('success-glow');
+      heroCard.classList.add('error-glow');
+
+      const missingDots = expectedDots.filter(d => !studentDots.includes(d));
+      const extraDots = studentDots.filter(d => !expectedDots.includes(d));
+
+      let hintAdvice = '';
+      if (studentDots.length === 0) {
+        hintAdvice = `আপনি কোনো বোতাম চাপেননি।`;
+      } else if (missingDots.length > 0 && extraDots.length === 0) {
+        hintAdvice = `আপনি চেপেছেন ডট [${studentDots.join(', ')}], কিন্তু ডট [${missingDots.join(', ')}] বাদ পড়েছে।`;
+      } else if (extraDots.length > 0 && missingDots.length === 0) {
+        hintAdvice = `আপনি অতিরিক্ত ডট [${extraDots.join(', ')}] চেপে ফেলেছেন।`;
+      } else {
+        hintAdvice = `আপনি চেপেছেন [${studentDots.join(', ') || 'কিছুই না'}]।`;
+      }
+
+      decisionBox.className = 'decision-hint-box hint show';
+      decisionBox.innerHTML = `
+        <div style="font-size: 14.5px; font-weight: 700; color: #92400e;">
+          ⚠️ ভুল হয়েছে! আবার চেষ্টা করুন
+        </div>
+        <div style="font-size: 13px; margin-top: 2px; color: #78350f;">
+          ${hintAdvice}
+        </div>
+        <div style="font-size: 12px; font-weight: 600; margin-top: 4px; color: #b45309;">
+          💡 হিন্ট: '${currentItem.char}'-এর জন্য চাপতে হবে ডট [${expectedDots.join(', ')}]
+        </div>
+      `;
+
+      // Play "ভুল" sound then prompt again
+      playSoundFile('0052.mp3');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Real-Time Hardware Listener (Poll Supabase for physical ESP32 button presses)
+  // -------------------------------------------------------------------------
+  function startHardwarePolling() {
+    setInterval(async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts?device_id=eq.${targetDeviceId}&order=created_at.desc&limit=1`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (rows && rows.length > 0) {
+            const latest = rows[0];
+            if (lastEvaluatedAttemptTime && latest.created_at !== lastEvaluatedAttemptTime) {
+              lastEvaluatedAttemptTime = latest.created_at;
+              // Student submitted on physical ESP32!
+              const enteredMask = latest.entered_pattern || 0;
+              const dots = maskToDotsArray(enteredMask);
+              evaluateSubmission(dots);
+            } else if (!lastEvaluatedAttemptTime) {
+              lastEvaluatedAttemptTime = latest.created_at;
+            }
+          }
+        }
+      } catch (e) {
+        // network silent
+      }
+    }, 900);
+  }
+
+  // -------------------------------------------------------------------------
+  // Remote Command Dispatcher to ESP32 over Supabase
+  // -------------------------------------------------------------------------
+  async function sendRemoteCommand(letterId) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/remote_commands`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          device_id: targetDeviceId,
+          letter_id: letterId
+        })
+      });
+    } catch (e) {}
+  }
+
+  // -------------------------------------------------------------------------
+  // Alphabet Grid & Random Picker
+  // -------------------------------------------------------------------------
+  let selectedPickerLetter = null;
+
+  function renderAlphabetGrid(filterCat) {
+    const grid = document.getElementById('alphabetGrid');
+    grid.innerHTML = '';
+    const filtered = letters.filter(l => filterCat === 'all' || l.category === filterCat);
+
+    filtered.forEach(item => {
+      const tile = document.createElement('div');
+      tile.className = 'char-tile' + (item.id < 12 ? ' mastered' : '');
+      if (selectedPickerLetter && selectedPickerLetter.id === item.id) {
+        tile.classList.add('selected');
+      }
+      tile.textContent = item.char;
+      tile.onclick = () => {
+        document.querySelectorAll('.char-tile').forEach(t => t.classList.remove('selected'));
+        tile.classList.add('selected');
+        selectedPickerLetter = item;
+        document.getElementById('pickerRandomPreview').textContent = item.char;
+      };
+      grid.appendChild(tile);
+    });
+  }
+
+  function filterCategory(cat, btn) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderAlphabetGrid(cat);
+  }
+
+  function pickRandomLetter() {
+    const rand = letters[Math.floor(Math.random() * letters.length)];
+    selectedPickerLetter = rand;
+    document.getElementById('pickerRandomPreview').textContent = rand.char;
+    renderAlphabetGrid('all');
+  }
+
+  function sendSelectedToESP() {
+    if (!selectedPickerLetter) selectedPickerLetter = letters[0];
+    sendRemoteCommand(selectedPickerLetter.id);
+    currentLetterIndex = letters.findIndex(l => l.id === selectedPickerLetter.id);
+    switchTab('viewLearn', 'সহজ পাঠ');
+    renderCurrentLetter(true);
+  }
+
+  // -------------------------------------------------------------------------
+  // Live Quiz Mode
+  // -------------------------------------------------------------------------
+  let quizIndex = 1;
+  let quizScore = 0;
+  let quizTotal = 10;
+  let quizTimerInterval = null;
+  let quizRemainingSec = 10;
+
+  function renderQuizQuestion() {
+    const rand = letters[Math.floor(Math.random() * letters.length)];
+    document.getElementById('quizTargetChar').textContent = rand.char;
+    document.getElementById('quizQuestionIdx').textContent = `প্রশ্ন ${toBanglaNum(quizIndex)}/${toBanglaNum(quizTotal)}`;
+    document.getElementById('quizLiveScore').textContent = `${toBanglaNum(quizScore)}/${toBanglaNum(Math.max(1, quizIndex - 1))}`;
+    
+    clearInterval(quizTimerInterval);
+    quizRemainingSec = 10;
+    updateTimerText();
+    quizTimerInterval = setInterval(() => {
+      quizRemainingSec--;
+      updateTimerText();
+      if (quizRemainingSec <= 0) {
+        nextQuizQuestion();
+      }
+    }, 1000);
+
+    sendRemoteCommand(rand.id);
+  }
+
+  function updateTimerText() {
+    const secStr = quizRemainingSec < 10 ? `০${toBanglaNum(quizRemainingSec)}` : toBanglaNum(quizRemainingSec);
+    document.getElementById('quizTimer').textContent = `${secStr} সে.`;
+  }
+
+  function nextQuizQuestion() {
+    quizScore++;
+    quizIndex++;
+    if (quizIndex > quizTotal) {
+      clearInterval(quizTimerInterval);
+      showResults();
+    } else {
+      renderQuizQuestion();
+    }
+  }
+
+  function endQuizEarly() {
+    clearInterval(quizTimerInterval);
+    showResults();
+  }
+
+  function showResults() {
+    const pct = Math.round((quizScore / quizTotal) * 100);
+    document.getElementById('resPercent').textContent = `${toBanglaNum(pct)}%`;
+    document.getElementById('resFraction').textContent = `${toBanglaNum(quizScore)} / ${toBanglaNum(quizTotal)} টি সঠিক`;
+    switchTab('viewResult', 'ফলাফল ও মূল্যায়ন');
+  }
+
+  function restartQuiz() {
+    quizIndex = 1;
+    quizScore = 0;
+    switchTab('viewQuiz', 'সহজ পরীক্ষা');
+    renderQuizQuestion();
+  }
+
+  function shareReport() {
+    const text = `শিক্ষার্থী: তানভীর আহমেদ | রোল: ০৪\nপরীক্ষা ফলাফল: ${quizScore}/${quizTotal} সঠিক (${Math.round((quizScore/quizTotal)*100)}%)\nস্মার্ট শিক্ষক ব্রেইল লার্নিং প্ল্যাটফর্ম।`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('অভিভাবকের জন্য রিপোর্ট ক্লিপবোর্ডে কপি করা হয়েছে!');
+      });
+    } else {
+      alert(text);
+    }
+  }
+
+  function exportReportPDF() {
+    window.print();
+  }
+
+  function switchTab(viewId, title, btn) {
+    document.querySelectorAll('.screen-view').forEach(v => v.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+    document.getElementById('appHeaderTitle').textContent = title;
+
+    if (btn) {
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  }
+
+  document.getElementById('deviceStatusPill').onclick = () => {
+    const newId = prompt('ESP32 Device ID লিখুন:', targetDeviceId);
+    if (newId) {
+      targetDeviceId = newId.trim();
+      localStorage.setItem('teacher.device_id', targetDeviceId);
+      document.getElementById('deviceLabel').textContent = `${targetDeviceId} সংযুক্ত`;
+    }
+  };
+
+  window.onload = initApp;
+</script>
+
+</body>
+</html>
+'''
+
+with open('web/teacher.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("Successfully updated web/teacher.html with full real-time decision engine!")

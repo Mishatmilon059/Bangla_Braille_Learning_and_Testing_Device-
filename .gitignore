@@ -28,3 +28,14 @@ docs/slide-*.jpg
 
 # PlatformIO build output
 .pio/
+
+# Drivers and large video recordings
+CP210x_Universal_Windows_Driver/
+CP210x_Universal_Windows_Driver.zip
+*.mkv
+*.mp4
+
+# Local IDE and scratch
+.vscode/
+.claude/
+scratch/
