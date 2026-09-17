@@ -35,7 +35,7 @@
 
 #include "braille_map.h"
 
-static const int PIN_MOTOR[6] = { 13, 4, 21, 22, 2, 15 };
+static const int PIN_MOTOR[6] = { 21, 13, 22, 2, 15, 4 };
 
 // Playback speeds, slowest first. "hint" and "normal" are lifted from
 // braille_tutor.ino, so stepping to them lets you feel what a learner actually

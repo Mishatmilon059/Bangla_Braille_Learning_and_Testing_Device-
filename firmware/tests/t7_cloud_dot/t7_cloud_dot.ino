@@ -49,7 +49,7 @@ static const char *SUPABASE_URL       = "https://rufaacgatrebsyxnyfbq.supabase.c
 static const char *SUPABASE_ANON_KEY  = "sb_publishable_lI3qv5Xk44GAhzL4R7I2GA_4k1aUar-";
 static const char *ESP_DEVICE_ID      = "esp32_01";   // must match what the app sends
 
-static const int PIN_MOTOR[6] = { 13, 4, 21, 22, 2, 15 };   // dot 1..6, from pins.h
+static const int PIN_MOTOR[6] = { 21, 13, 22, 2, 15, 4 };   // dot 1..6, from pins.h
 static const uint16_t DOT_ON_MS  = 1000;   // per-dot buzz duration
 static const uint16_t DOT_GAP_MS = 400;    // silence between dots, same cell
 static const uint32_t POLL_INTERVAL_MS = 700;

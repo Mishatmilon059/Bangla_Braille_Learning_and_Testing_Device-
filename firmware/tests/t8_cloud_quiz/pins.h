@@ -33,7 +33,7 @@ static const int PIN_SUBMIT = 12;
 // GPIO 2 and 15 are strapping pins. They are usable as outputs but are sampled
 // at boot, so add 10k pulldowns on both. GPIO 12 is used for the submit
 // button above, not for a motor -- see that note for why it must stay LOW.
-static const int PIN_MOTOR[6] = { 13, 4, 21, 22, 2, 15 };
+static const int PIN_MOTOR[6] = { 21, 13, 22, 2, 15, 4 };
 #define MOTOR_ACTIVE_HIGH 1
 
 // --- DFPlayer Mini, UART2 --------------------------------------------------

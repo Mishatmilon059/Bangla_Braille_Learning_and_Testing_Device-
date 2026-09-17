@@ -13,7 +13,7 @@
 // hold 800 mA, or the 1000 uF bulk capacitor is missing.
 // If nothing buzzes at all: COM is not tied to +5V, or you wired the motors to
 // the ULN2803A inputs instead of its outputs.
-static const int PIN_MOTOR[6] = { 13, 4, 21, 22, 2, 15 };
+static const int PIN_MOTOR[6] = { 21, 13, 22, 2, 15, 4 };
 
 void setup() {
   Serial.begin(115200);

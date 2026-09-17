@@ -142,7 +142,7 @@ void setup() {
   delay(400);
   g_df_ok = df.begin(Serial2, /*isACK=*/true, /*doReset=*/true);
   if (g_df_ok) {
-    df.volume(22);
+    df.volume(30);
     Serial.printf("DFPlayer ok, %d files on card (expect 60)\n", df.readFileCounts());
   } else {
     Serial.println("DFPlayer not found -- check wiring, card FAT32, /mp3 files present");

@@ -13,6 +13,7 @@ web/config.local.js
 firmware/tests/t7_cloud_dot/secrets.h
 firmware/tests/t8_cloud_quiz/secrets.h
 firmware/tests/t9_dfplayer_test/secrets.h
+firmware/tests/t10_learning/secrets.h
 
 
 # training intermediates
