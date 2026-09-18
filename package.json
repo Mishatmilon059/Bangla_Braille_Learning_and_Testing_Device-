@@ -1,24 +1,33 @@
-{
-  "name": "eee_416",
+﻿{
+  "name": "bangla-braille-learning-and-testing-device",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "AI-Assisted Bangla Braille Learning and Testing System with Offline ESP32 TinyML Inference and Haptic-Audio Feedback",
+  "main": "index.html",
   "scripts": {
     "dev": "python -m http.server 8000",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "python tools/run_all_tests.py"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mishatmilon059/eee_416.git"
+    "url": "git+https://github.com/Mishatmilon059/Bangla_Braille_Learning_and_Testing_Device-.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "bangla-braille",
+    "assistive-technology",
+    "tinyml",
+    "esp32",
+    "embedded-machine-learning",
+    "haptic-feedback"
+  ],
+  "author": "BUET EEE 416 Group 08",
+  "contributors": [
+    "Santu Nag (2106055)",
+    "Md. Adib Hasan Audhi (2106056)",
+    "Mishat Hasan Milon (2106059)",
+    "Khalid Mehebub (2106065)"
+  ],
   "bugs": {
-    "url": "https://github.com/mishatmilon059/eee_416/issues"
+    "url": "https://github.com/Mishatmilon059/Bangla_Braille_Learning_and_Testing_Device-/issues"
   },
-  "homepage": "https://github.com/mishatmilon059/eee_416#readme"
+  "homepage": "https://github.com/Mishatmilon059/Bangla_Braille_Learning_and_Testing_Device-#readme"
 }

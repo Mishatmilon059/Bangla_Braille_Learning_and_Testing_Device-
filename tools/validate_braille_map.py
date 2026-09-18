@@ -28,6 +28,8 @@ def dots_to_mask(dots):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     data = json.loads(MAP_PATH.read_text(encoding="utf-8"))
     letters = data["letters"]
     errors = []
@@ -61,26 +63,27 @@ def main():
             warnings.append(f"id {l['id']} ({l['char']}): dots not sorted {l['dots']}")
 
     # --- duplicate patterns: the important one ---
-    # Two tiers. A pattern shared by two VERIFIED letters is a real conflict:
-    # a learner could not tell them apart and neither could the model, so one
-    # reading must be wrong. A pattern shared by a verified letter and an
-    # unverified PLACEHOLDER is expected while images arrive in batches -- the
-    # placeholder is a guess and should change once its own image lands.
+    # Multi-cell characters (e.g. ri and khanda_ta with prefix dot 5) are distinguished
+    # by their full cell sequence as defined in Bangladesh National Braille Code.
     by_mask = {}
     for l in letters:
-        m = dots_to_mask(l["dots"])
-        by_mask.setdefault(m, []).append(l)
-    for mask, group in sorted(by_mask.items()):
+        cells = l.get("cells")
+        if cells:
+            key = tuple(tuple(sorted(c)) for c in cells)
+        else:
+            key = tuple(sorted(l["dots"]))
+        by_mask.setdefault(key, []).append(l)
+    for pattern_key, group in sorted(by_mask.items(), key=lambda x: str(x[0])):
         if len(group) < 2:
             continue
         ver = [g for g in group if g.get("verified")]
         unver = [g for g in group if not g.get("verified")]
         fmt = lambda gs: ", ".join(f"{g['char']}({g['name']})" for g in gs)
         if len(ver) > 1:
-            errors.append(f"DUPLICATE pattern {sorted(group[0]['dots'])} between "
+            errors.append(f"DUPLICATE pattern {pattern_key} between "
                           f"VERIFIED letters: {fmt(ver)}")
         else:
-            warnings.append(f"pattern {sorted(group[0]['dots'])}: "
+            warnings.append(f"pattern {pattern_key}: "
                             f"verified {fmt(ver) or '(none)'} vs "
                             f"unverified placeholder {fmt(unver)} "
                             "-- expected until that letter's image arrives")

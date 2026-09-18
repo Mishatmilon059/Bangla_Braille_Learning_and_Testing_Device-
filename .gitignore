@@ -1,44 +1,60 @@
+﻿# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Virtual environments
 .venv/
 venv/
+env/
+
+# Package managers and Node
 node_modules/
-.DS_Store
-
-# local Supabase credentials (anon key is public, but keep it out of git anyway)
-web/config.local.js
-.env
-
-# ESP32 WiFi credentials — never commit real credentials
-firmware/tests/t7_cloud_dot/secrets.h
-firmware/tests/t8_cloud_quiz/secrets.h
-firmware/tests/t9_dfplayer_test/secrets.h
-firmware/tests/t10_learning/secrets.h
-firmware/tests/t11_testing/secrets.h
-firmware/t11_ml_test/secrets.h
-
-
-# training intermediates
-dataset/*.csv
-!dataset/.gitkeep
-models/*.keras
-models/*.h5
-.tmp_*.wav
 package-lock.json
-.pptx_work/
-docs/*.pdf
-docs/slide-*.jpg
 
-# PlatformIO build output
-.pio/
-
-# Drivers and large video recordings
-CP210x_Universal_Windows_Driver/
-CP210x_Universal_Windows_Driver.zip
-*.mkv
-*.mp4
-
-# Local IDE and scratch
+# Local and OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
 .vscode/
 .claude/
+.idea/
+*.swp
+*~
+
+# Local sensitive credentials — NEVER commit real credentials or API secrets
+.env
+.env*.local
+web/config.local.js
+**/secrets.h
+!**/secrets.h.example
+
+# Keras training model weights / checkpoints
+models/*.keras
+models/*.h5
+*.keras
+*.h5
+
+# Embedded and PlatformIO build outputs
+.pio/
+.pioenvs/
+.piolibdeps/
+*.hex
+*.bin
+*.elf
+*.o
+*.a
+*.d
+
+# Scratch and intermediate artifacts
 scratch/
+.tmp_*.wav
+*.tmp
+*.bak
+.pptx_work/
+
+# Large videos and external driver installers
+*.mkv
+*.mp4
+CP210x_Universal_Windows_Driver/
+CP210x_Universal_Windows_Driver.zip
