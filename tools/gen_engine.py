@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPEC_PATH = ROOT / "spec" / "engine_spec.json"
 JS_OUT = ROOT / "web" / "rule_engine.js"
+WEBAPP_JS_OUT = ROOT / "webapp" / "lib" / "ruleEngine.js"
 H_OUT = ROOT / "firmware" / "braille_tutor" / "rule_engine.h"
 PY_OUT = ROOT / "tools" / "rule_engine_gen.py"
 
@@ -377,12 +378,19 @@ def main():
     spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
     JS_OUT.parent.mkdir(parents=True, exist_ok=True)
     H_OUT.parent.mkdir(parents=True, exist_ok=True)
-    JS_OUT.write_text(gen_js(spec), encoding="utf-8")
+    PY_OUT.parent.mkdir(parents=True, exist_ok=True)
+    js_src = gen_js(spec)
+    JS_OUT.write_text(js_src, encoding="utf-8")
     H_OUT.write_text(gen_h(spec), encoding="utf-8")
     PY_OUT.write_text(gen_py(spec), encoding="utf-8")
     print(f"wrote {JS_OUT.relative_to(ROOT)}")
     print(f"wrote {H_OUT.relative_to(ROOT)}")
     print(f"wrote {PY_OUT.relative_to(ROOT)}")
+    # webapp/ (Next.js) is optional -- only write its copy if the app exists,
+    # so this script still works on checkouts that predate the Next.js app.
+    if WEBAPP_JS_OUT.parent.exists():
+        WEBAPP_JS_OUT.write_text(js_src, encoding="utf-8")
+        print(f"wrote {WEBAPP_JS_OUT.relative_to(ROOT)}")
     model_count = sum(1 for f in spec["features"] if f.get("model_input", True))
     print(f"\n{len(spec['features'])} logged features ({model_count} fed to the model), "
           f"{len(spec['teaching_action_rules'])} teaching rules, "

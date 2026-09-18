@@ -91,8 +91,9 @@ async function boot() {
   // Profile gate: show profile screen on first visit
   const profile = loadProfile();
   if (!profile) {
+    $('profileScreen').classList.remove('hidden');
     wireProfileEvents();
-    return;                   // profileScreen is visible by default (no .hidden)
+    return;
   }
 
   $('profileScreen').classList.add('hidden');
@@ -605,4 +606,6 @@ function renderCharTable() {
   }).join('');
 }
 
-boot();
+// Not auto-started: the home screen's "ব্রেইল শেখা" button calls this once
+// the visitor has chosen the student-practice app over the teacher panel.
+window.startBrailleApp = boot;

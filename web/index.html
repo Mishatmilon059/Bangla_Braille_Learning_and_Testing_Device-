@@ -241,8 +241,8 @@
     position: fixed; inset: 0; z-index: 1000;
     background: var(--bg);
     background-image:
-      radial-gradient(circle at 20% 20%, rgba(59,130,246,0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(99,102,241,0.12) 0%, transparent 50%);
+      radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12) 0%, transparent 45%),
+      radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.1) 0%, transparent 45%);
     display: flex; align-items: center; justify-content: center;
     padding: 24px;
   }
@@ -296,6 +296,53 @@
     padding: 4px 10px; font-size: 0.75rem; border-radius: 999px; margin: 0;
     box-shadow: none;
   }
+
+  /* --- home / mode-select screen ------------------------------------------ */
+  #homeScreen {
+    position: fixed; inset: 0; z-index: 1001;
+    background: #f8fafc;
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(34, 197, 94, 0.1) 0%, transparent 45%),
+      radial-gradient(circle at 85% 85%, rgba(22, 163, 74, 0.08) 0%, transparent 45%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  #homeScreen.hidden { display: none; }
+  .home-card {
+    background: #ffffff; border: 1.5px solid #e2e8f0;
+    border-radius: 24px; padding: 40px 32px; width: 100%; max-width: 640px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    text-align: center;
+  }
+  .home-card .profile-dots span {
+    background: #e2e8f0; border: 1px solid #cbd5e1;
+  }
+  .home-card .profile-dots span.on {
+    background: #16a34a; border-color: #15803d;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+  }
+  .home-card h1 {
+    font-size: 1.5rem; font-weight: 700; margin: 0 0 8px;
+    font-family: "Outfit", "Hind Siliguri", sans-serif;
+    color: #0f172a;
+    background: none; -webkit-text-fill-color: initial;
+  }
+  .home-card > p { color: #64748b; font-size: 0.95rem; margin: 0 0 28px; }
+  .home-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 560px) { .home-options { grid-template-columns: 1fr; } }
+  .home-option {
+    background: #ffffff; border: 2px solid #e2e8f0; border-radius: 18px;
+    padding: 28px 18px; cursor: pointer; text-align: center; font: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.03); color: #0f172a;
+  }
+  .home-option:hover {
+    border-color: #16a34a; background: #f0fdf4;
+    transform: translateY(-3px); box-shadow: 0 12px 24px rgba(22, 163, 74, 0.12);
+  }
+  .home-opt-icon { font-size: 2.3rem; }
+  .home-opt-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+  .home-opt-desc { font-size: 0.82rem; color: #475569; line-height: 1.45; font-weight: 400; }
 
   /* --- collapsible panels ------------------------------------------------- */
   .panel-toggle {
@@ -458,8 +505,33 @@
 
 </div>
 
+<!-- ---------------- home / mode-select screen ---------------- -->
+<div id="homeScreen">
+  <div class="home-card">
+    <div class="profile-dots">
+      <span class="on"></span><span></span>
+      <span class="on"></span><span class="on"></span>
+      <span></span><span class="on"></span>
+    </div>
+    <h1>বাংলা ব্রেইল অ্যাপে আপনাকে স্বাগতম</h1>
+    <p>নিচের একটি অপশন বেছে নিন</p>
+    <div class="home-options">
+      <button class="home-option" id="homeLearnBtn" type="button">
+        <span class="home-opt-icon">📖</span>
+        <span class="home-opt-title">ব্রেইল শেখা</span>
+        <span class="home-opt-desc">নিজে অনুশীলন করো, ব্রেইল অক্ষর শেখো ও পরীক্ষা দাও</span>
+      </button>
+      <button class="home-option" id="homeTeacherBtn" type="button">
+        <span class="home-opt-icon">👩‍🏫</span>
+        <span class="home-opt-title">ব্রেইল টেস্টিং (শিক্ষক)</span>
+        <span class="home-opt-desc">শিক্ষার্থীকে দূর থেকে পরিচালনা করো ও ফলাফল দেখো</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ---------------- profile screen overlay ---------------- -->
-<div id="profileScreen">
+<div id="profileScreen" class="hidden">
   <div class="profile-card">
     <div class="profile-dots">
       <span class="on"></span><span></span>
@@ -487,6 +559,14 @@ function togglePanel(bodyId, btnId) {
   const collapsed = body.classList.toggle('collapsed');
   btn.textContent = collapsed ? '▾ দেখাও' : '▴ লুকাও';
 }
+
+document.getElementById('homeLearnBtn').addEventListener('click', () => {
+  document.getElementById('homeScreen').classList.add('hidden');
+  if (window.startBrailleApp) window.startBrailleApp();
+});
+document.getElementById('homeTeacherBtn').addEventListener('click', () => {
+  window.location.href = 'teacher.html';
+});
 </script>
 <script type="module" src="./app.js"></script>
 </body>

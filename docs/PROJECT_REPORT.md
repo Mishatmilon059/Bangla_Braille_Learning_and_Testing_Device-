@@ -1,7 +1,7 @@
 # AI-Assisted Bangla Braille Tutor — End-to-End Project Report
 
-**Repository:** `Mishatmilon059/eee_416`
-**Branch:** `claude/esp32-offline-ml-plan-uqbjnd`
+**Repository:** `Mishatmilon059/Bangla_Braille_Learning_and_Testing_Device-`
+**Branch:** `main`
 **Report date:** 30 July 2026
 **Status:** software complete and tested · data collection not started · hardware not built
 
