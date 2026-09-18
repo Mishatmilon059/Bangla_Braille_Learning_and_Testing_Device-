@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<title>TinyML model architecture</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="60" y="66" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#111827" text-anchor="start">TinyML model architecture</text>
+<text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="16.5" font-weight="normal" fill="#6B7280" text-anchor="start">Two independent networks — 1,734 trainable parameters combined</text>
+<rect x="1480.0" y="44" width="58.400000000000006" height="26" rx="13.0" ry="13.0" fill="#ECFAF4" stroke="#059669" stroke-width="1.5"/>
+<text x="1509.2" y="61.68" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">BUILT</text>
+<text x="60" y="168" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#0D9488" text-anchor="start">TEACHING-ACTION NETWORK (TA)</text>
+<rect x="615" y="150" width="77.6" height="20" rx="10.0" ry="10.0" fill="#EDFAF8" stroke="#0D9488" stroke-width="1.5"/>
+<text x="653.8" y="163.6" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="bold" fill="#0D9488" text-anchor="middle">867 params</text>
+<rect x="60" y="180" width="120" height="240" rx="12" ry="12" fill="#EDFAF8" stroke="#0D9488" stroke-width="2.5"/>
+<text x="120.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">IN</text>
+<text x="120.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">8 feat.</text>
+<circle cx="120.0" cy="258" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="274" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="290" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="306" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="322" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="345" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="353" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="120.0" cy="361" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<path d="M 184 300.0 L 220 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="224" y="180" width="175" height="240" rx="12" ry="12" fill="#EDFAF8" stroke="#0D9488" stroke-width="2.5"/>
+<text x="311.5" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 32</text>
+<text x="311.5" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">ReLU</text>
+<circle cx="311.5" cy="258" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="274" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="290" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="306" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="322" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="345" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="353" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="311.5" cy="361" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<text x="311.5" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#0D9488" text-anchor="middle">288p</text>
+<path d="M 403 300.0 L 407 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="411" y="180" width="160" height="240" rx="12" ry="12" fill="#EDFAF8" stroke="#0D9488" stroke-width="2.5"/>
+<text x="491.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 16</text>
+<text x="491.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">ReLU</text>
+<circle cx="491.0" cy="258" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="274" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="290" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="306" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="322" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="345" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="353" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="491.0" cy="361" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<text x="491.0" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#0D9488" text-anchor="middle">528p</text>
+<path d="M 575 300.0 L 579 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="583" y="180" width="160" height="240" rx="12" ry="12" fill="#EDFAF8" stroke="#0D9488" stroke-width="2.5"/>
+<text x="663.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 3</text>
+<text x="663.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">softmax · teaching</text>
+<circle cx="663.0" cy="258" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="663.0" cy="274" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="663.0" cy="290" r="6" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="663.0" cy="313" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="663.0" cy="321" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<circle cx="663.0" cy="329" r="2.2" fill="#0D9488" stroke="#0D9488" stroke-width="2"/>
+<text x="663.0" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#0D9488" text-anchor="middle">51p</text>
+<text x="830" y="168" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#DB2777" text-anchor="start">CONFIDENCE-STATE NETWORK (CS)</text>
+<rect x="1385" y="150" width="77.6" height="20" rx="10.0" ry="10.0" fill="#FDF0F6" stroke="#DB2777" stroke-width="1.5"/>
+<text x="1423.8" y="163.6" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="bold" fill="#DB2777" text-anchor="middle">867 params</text>
+<rect x="830" y="180" width="120" height="240" rx="12" ry="12" fill="#FDF0F6" stroke="#DB2777" stroke-width="2.5"/>
+<text x="890.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">IN</text>
+<text x="890.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">8 feat.</text>
+<circle cx="890.0" cy="258" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="274" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="290" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="306" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="322" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="345" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="353" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="890.0" cy="361" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<path d="M 954 300.0 L 990 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="994" y="180" width="175" height="240" rx="12" ry="12" fill="#FDF0F6" stroke="#DB2777" stroke-width="2.5"/>
+<text x="1081.5" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 32</text>
+<text x="1081.5" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">ReLU</text>
+<circle cx="1081.5" cy="258" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="274" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="290" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="306" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="322" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="345" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="353" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1081.5" cy="361" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<text x="1081.5" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#DB2777" text-anchor="middle">288p</text>
+<path d="M 1173 300.0 L 1177 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1181" y="180" width="160" height="240" rx="12" ry="12" fill="#FDF0F6" stroke="#DB2777" stroke-width="2.5"/>
+<text x="1261.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 16</text>
+<text x="1261.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">ReLU</text>
+<circle cx="1261.0" cy="258" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="274" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="290" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="306" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="322" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="345" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="353" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1261.0" cy="361" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<text x="1261.0" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#DB2777" text-anchor="middle">528p</text>
+<path d="M 1345 300.0 L 1349 300.0" fill="none" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1353" y="180" width="160" height="240" rx="12" ry="12" fill="#FDF0F6" stroke="#DB2777" stroke-width="2.5"/>
+<text x="1433.0" y="210" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#111827" text-anchor="middle">DENSE 3</text>
+<text x="1433.0" y="230" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#6B7280" text-anchor="middle">softmax · confidence</text>
+<circle cx="1433.0" cy="258" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1433.0" cy="274" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1433.0" cy="290" r="6" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1433.0" cy="313" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1433.0" cy="321" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<circle cx="1433.0" cy="329" r="2.2" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<text x="1433.0" y="406" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#DB2777" text-anchor="middle">51p</text>
+<text x="60" y="454" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="normal" fill="#6B7280" text-anchor="start">Same shape, trained independently — inputs are shared, weights are not. Both run on every attempt; neither depends on the other's output.</text>
+<rect x="60" y="486" width="1480" height="110" rx="12" ry="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+<text x="84" y="520" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Parameters (both nets)</text>
+<text x="84" y="542" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">1,734</text>
+<text x="449" y="520" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Exported as</text>
+<text x="449" y="542" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">C float32 arrays</text>
+<text x="814" y="520" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">On-device weight size</text>
+<text x="814" y="542" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">6,936 B</text>
+<text x="1179" y="520" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Teaching acc. (real)</text>
+<text x="1179" y="542" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">98.6%</text>
+<text x="84" y="572" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Confidence acc. (real)</text>
+<text x="84" y="594" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">91.4%</text>
+<text x="449" y="572" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Boot self-test</text>
+<text x="449" y="594" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">20 / 20 match</text>
+<text x="814" y="572" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Inference time</text>
+<text x="814" y="594" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">~0.1 ms, both</text>
+<text x="1179" y="572" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">Training time</text>
+<text x="1179" y="594" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="start">&lt; 30 s, CPU</text>
+<rect x="60" y="616" width="1480" height="145" rx="12" ry="12" fill="#FEF6EC" stroke="#D97706" stroke-width="2.5"/>
+<text x="84" y="652" font-family="Arial, Helvetica, sans-serif" font-size="16.5" font-weight="bold" fill="#D97706" text-anchor="start">WHAT THIS MODEL ACTUALLY DOES — state this plainly in the report</text>
+<text x="84" y="686" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#111827" text-anchor="start">The training labels are produced by a hand-written rule engine, so the networks learn to REPRODUCE that engine — measured at 98.6% / 91.4% real-only agreement.</text>
+<text x="84" y="712" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#111827" text-anchor="start">That is a real embedded-ML result: an adaptive teaching policy compressed into 1,734 parameters (6.8 KB) that run offline on a $4 microcontroller, no runtime library.</text>
+<text x="84" y="738" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#111827" text-anchor="start">It is not autonomous discovery of teaching strategy and must not be described that way. The interesting evidence is where the model disagrees with the engine.</text>
+<text x="60" y="866" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#6B7280" text-anchor="start" font-style="italic">sklearn MLPClassifier, not TensorFlow (incompatible with Python 3.12 on Windows) — weights are exported directly as C arrays, no TFLite, no arena.</text>
+</svg>

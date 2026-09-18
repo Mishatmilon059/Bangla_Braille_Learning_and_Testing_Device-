@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<title>Bill of materials and estimated cost</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="60" y="66" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#111827" text-anchor="start">Bill of materials — estimated cost</text>
+<text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="16.5" font-weight="normal" fill="#6B7280" text-anchor="start">Retail estimates for Bangladesh, BDT and USD — approximate, not vendor quotes</text>
+<rect x="1480.0" y="44" width="58.400000000000006" height="26" rx="13.0" ry="13.0" fill="#ECFAF4" stroke="#059669" stroke-width="1.5"/>
+<text x="1509.2" y="61.68" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">BUILT</text>
+<text x="60" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">COMPONENT</text>
+<text x="780" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">QTY</text>
+<text x="900" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">UNIT (BDT)</text>
+<text x="1080" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">SUBTOTAL (BDT)</text>
+<text x="1300" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">SUBTOTAL (USD)</text>
+<line x1="60" y1="164" x2="1540" y2="164" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="60" y="168" width="1480" height="34" rx="12" ry="12" fill="#FAFBFC" stroke="none" stroke-width="0"/>
+<text x="60" y="190" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">ESP32-WROOM-32 dev board</text>
+<text x="800" y="190" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="190" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">450</text>
+<text x="1130" y="190" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">450</text>
+<text x="1340" y="190" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$3.81</text>
+<text x="60" y="224" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">DFPlayer Mini + 3 W speaker</text>
+<text x="800" y="224" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="224" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">260</text>
+<text x="1130" y="224" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">260</text>
+<text x="1340" y="224" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$2.20</text>
+<rect x="60" y="236" width="1480" height="34" rx="12" ry="12" fill="#FAFBFC" stroke="none" stroke-width="0"/>
+<text x="60" y="258" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">ULN2803A driver IC</text>
+<text x="800" y="258" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="258" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">25</text>
+<text x="1130" y="258" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">25</text>
+<text x="1340" y="258" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$0.21</text>
+<text x="60" y="292" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">Coin vibration motors</text>
+<text x="800" y="292" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">6</text>
+<text x="940" y="292" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">30</text>
+<text x="1130" y="292" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">180</text>
+<text x="1340" y="292" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$1.53</text>
+<rect x="60" y="304" width="1480" height="34" rx="12" ry="12" fill="#FAFBFC" stroke="none" stroke-width="0"/>
+<text x="60" y="326" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">Tactile buttons (6 dot + 1 submit)</text>
+<text x="800" y="326" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">7</text>
+<text x="940" y="326" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">5</text>
+<text x="1130" y="326" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">35</text>
+<text x="1340" y="326" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$0.30</text>
+<text x="60" y="360" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">microSD module</text>
+<text x="800" y="360" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="360" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">90</text>
+<text x="1130" y="360" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">90</text>
+<text x="1340" y="360" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$0.76</text>
+<rect x="60" y="372" width="1480" height="34" rx="12" ry="12" fill="#FAFBFC" stroke="none" stroke-width="0"/>
+<text x="60" y="394" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">5 V 2 A power supply</text>
+<text x="800" y="394" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="394" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">150</text>
+<text x="1130" y="394" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">150</text>
+<text x="1340" y="394" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$1.27</text>
+<text x="60" y="428" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">1000 µF capacitor</text>
+<text x="800" y="428" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="428" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">10</text>
+<text x="1130" y="428" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">10</text>
+<text x="1340" y="428" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$0.08</text>
+<rect x="60" y="440" width="1480" height="34" rx="12" ry="12" fill="#FAFBFC" stroke="none" stroke-width="0"/>
+<text x="60" y="462" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">Resistors (6×1kΩ + 3×10kΩ)</text>
+<text x="800" y="462" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">9</text>
+<text x="940" y="462" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="1130" y="462" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">9</text>
+<text x="1340" y="462" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$0.08</text>
+<text x="60" y="496" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">DS3231 RTC (optional)</text>
+<text x="800" y="496" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">1</text>
+<text x="940" y="496" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">120</text>
+<text x="1130" y="496" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#111827" text-anchor="middle">120</text>
+<text x="1340" y="496" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#6B7280" text-anchor="middle">$1.02</text>
+<line x1="60" y1="522" x2="1540" y2="522" stroke="#111827" stroke-width="2" stroke-linecap="round"/>
+<text x="60" y="542" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">TOTAL (core build, no RTC)</text>
+<text x="1130" y="542" font-family="Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#0D9488" text-anchor="middle">1,209 BDT</text>
+<text x="1340" y="542" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#0D9488" text-anchor="middle">≈ $10.25</text>
+<text x="60" y="576" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">TOTAL (with optional DS3231 RTC)</text>
+<text x="1130" y="576" font-family="Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#0D9488" text-anchor="middle">1,329 BDT</text>
+<text x="1340" y="576" font-family="Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#0D9488" text-anchor="middle">≈ $11.26</text>
+<rect x="60" y="632" width="1480" height="130" rx="12" ry="12" fill="#FEF6EC" stroke="#D97706" stroke-width="2.5"/>
+<text x="84" y="666" font-family="Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#D97706" text-anchor="start">THESE ARE ESTIMATES, NOT QUOTES</text>
+<text x="84" y="698" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">Unit prices are approximate current Bangladeshi retail/hobbyist-market figures (≈118 BDT/USD used for scale only) — they move with</text>
+<text x="84" y="720" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" fill="#111827" text-anchor="start">vendor, quantity and import duty, and are not claimed to be precise to the taka. Get current quotes before ordering for a build.</text>
+<text x="60" y="866" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#6B7280" text-anchor="start" font-style="italic">Matches the component list in README.md 'Hardware'. Excludes wire, solder, enclosure and shipping.</text>
+</svg>

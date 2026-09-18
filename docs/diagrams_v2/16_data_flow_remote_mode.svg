@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<title>Teacher-panel remote mode data flow</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="60" y="66" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#111827" text-anchor="start">Remote / cloud-connected mode — how data moves</text>
+<text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="16.5" font-weight="normal" fill="#6B7280" text-anchor="start">No direct browser-to-ESP32 link — everything relays through two polled Supabase tables</text>
+<rect x="1480.0" y="44" width="58.400000000000006" height="26" rx="13.0" ry="13.0" fill="#ECFAF4" stroke="#059669" stroke-width="1.5"/>
+<text x="1509.2" y="61.68" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">BUILT</text>
+<text x="140" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#DB2777" text-anchor="middle">TEACHER PANEL</text>
+<line x1="140" y1="166" x2="140" y2="710" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<text x="800" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#7C3AED" text-anchor="middle">SUPABASE</text>
+<line x1="800" y1="166" x2="800" y2="710" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<text x="1400" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#EA580C" text-anchor="middle">ESP32 (WiFi mode)</text>
+<line x1="1400" y1="166" x2="1400" y2="710" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 6"/>
+<circle cx="140" cy="200" r="5" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<text x="164" y="196" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start">Teacher selects letters,</text>
+<text x="164" y="216" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">clicks Start</text>
+<circle cx="800" cy="270" r="5" fill="#7C3AED" stroke="#7C3AED" stroke-width="2"/>
+<text x="824" y="266" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start">INSERT remote_commands</text>
+<text x="824" y="286" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">{device_id, letter_id, command, test_index, test_total}</text>
+<circle cx="1400" cy="340" r="5" fill="#EA580C" stroke="#EA580C" stroke-width="2"/>
+<text x="1376" y="336" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="end">polled every ~250 ms;</text>
+<text x="1376" y="356" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="end">plays audio (+ vibration in Learn mode)</text>
+<circle cx="1400" cy="410" r="5" fill="#EA580C" stroke="#EA580C" stroke-width="2"/>
+<text x="1376" y="406" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="end">waits for the physical dot</text>
+<text x="1376" y="426" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="end">buttons + SUBMIT — no web input path</text>
+<circle cx="800" cy="480" r="5" fill="#7C3AED" stroke="#7C3AED" stroke-width="2"/>
+<text x="824" y="476" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start">INSERT attempts</text>
+<text x="824" y="496" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">{char_id, entered/expected pattern, is_correct, response_time,</text>
+<circle cx="800" cy="550" r="5" fill="#7C3AED" stroke="#7C3AED" stroke-width="2"/>
+<text x="824" y="546" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start"></text>
+<text x="824" y="566" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">retry_count, teaching_action, confidence_state, source: esp32}</text>
+<circle cx="140" cy="620" r="5" fill="#DB2777" stroke="#DB2777" stroke-width="2"/>
+<text x="164" y="616" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start">polled every ~200 ms;</text>
+<text x="164" y="636" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">shows the result live, sends the next letter</text>
+<circle cx="800" cy="690" r="5" fill="#7C3AED" stroke="#7C3AED" stroke-width="2"/>
+<text x="824" y="686" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="bold" fill="#111827" text-anchor="start">after the last letter: INSERT</text>
+<text x="824" y="706" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="normal" fill="#6B7280" text-anchor="start">test_sessions + student_weaknesses</text>
+<text x="60" y="716" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">test_index / test_total on remote_commands are only set for command: "test" rows — that's how the ESP32 knows its</text>
+<text x="60" y="736" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#6B7280" text-anchor="start">position in the teacher's batch and when to print the final score to Serial.</text>
+<text x="60" y="866" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#6B7280" text-anchor="start" font-style="italic">Verbatim sequence from README.md 'How data moves'. Only one of t10_learning / t11_testing / t11_ml_test is flashed at a time.</text>
+</svg>

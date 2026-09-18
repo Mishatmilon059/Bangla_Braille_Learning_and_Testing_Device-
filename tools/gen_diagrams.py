@@ -20,25 +20,89 @@ exist yet, and a deck that shows them identically to the finished ones would
 misrepresent the project to anyone reading it.
 """
 import json
+import os
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from svgkit import (APP, BAD, DATA, FONT_BN, HW, INK, LINE, MODEL, MUTED, OK,
-                    SIM, TINT, WARN, WHITE, Svg)
+from svgkit import (APP, BAD, DATA, FONT_BN, H, HW, INK, LINE, MODEL, MUTED,
+                    OK, SIM, TINT, W, WARN, WHITE, Svg)
 
-OUT = ROOT / "docs" / "diagrams"
+# Both overridable so this one script can regenerate either the original
+# docs/diagrams (metrics.json, kept for comparison) or a fresh set from the
+# current, authoritative metrics_final.json -- see tools/gen_diagrams_v2.py.
+OUT = Path(os.environ.get("GEN_DIAGRAMS_OUT", str(ROOT / "docs" / "diagrams")))
+METRICS_PATH = Path(os.environ.get("GEN_DIAGRAMS_METRICS", str(ROOT / "models" / "metrics.json")))
+INCLUDE_EXTRA = os.environ.get("GEN_DIAGRAMS_EXTRA") == "1"
+
+
+def _count_params_from_header(header_path):
+    """Ground truth for parameter count: count the floats actually compiled
+    into firmware/braille_tutor/model_weights.h, rather than trusting any
+    document (two of which disagreed on this number)."""
+    text = header_path.read_text(encoding="utf-8")
+    total = 0
+    for m in re.finditer(r"static const float ML_\w+\[\]\s*=\s*\{([^}]*)\}", text):
+        total += len(re.findall(r"-?[\d.]+f", m.group(1)))
+    return total
+
+
+def _load_metrics(path):
+    """Adapts either metrics.json (old schema: 4 features/790 params) or
+    metrics_final.json (current schema: 8 features/1,734 params) into one
+    shape the diagram builders can read without caring which file it was."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if "trainable_params_approx" in raw:
+        # Old schema (models/metrics.json) -- kept working for comparison runs.
+        # This file predates TFLite export too (see its own "note" field), so
+        # bytes is the same raw-float32 estimate used for the current model.
+        params = raw["trainable_params_approx"]
+        ta = raw.get("test_accuracy", {})
+        return {
+            "params": params,
+            "bytes": params * 4,
+            "teach_acc": ta.get("teaching_real_only", ta.get("teaching_combined", 0)),
+            "conf_acc": ta.get("confidence_real_only", ta.get("confidence_combined", 0)),
+            "features": raw.get("features", []),
+            "n_features_model": len(raw.get("features", [])),
+            "real": raw.get("rows", {}).get("real", 0),
+            "synthetic": raw.get("rows", {}).get("synthetic", 0),
+            "total": raw.get("rows", {}).get("total", 0),
+        }
+    # Current schema (models/metrics_final.json).
+    params = _count_params_from_header(ROOT / "firmware" / "braille_tutor" / "model_weights.h")
+    return {
+        "params": params,
+        "bytes": params * 4,           # raw float32 C arrays -- no TFLite, no quantization
+        "teach_acc": raw["test_accuracy"]["teaching_real_only"],
+        "conf_acc": raw["test_accuracy"]["confidence_real_only"],
+        "teach_combined": raw["test_accuracy"]["teaching_combined"],
+        "conf_combined": raw["test_accuracy"]["confidence_combined"],
+        "features": raw["features"],
+        "n_features_model": raw["feature_count"],
+        "real": raw["dataset"]["real"],
+        "synthetic": raw["dataset"]["synthetic"],
+        "total": raw["dataset"]["total"],
+    }
+
 
 # Real measured figures, read from the repo so the slides cannot drift from it.
-M = json.loads((ROOT / "models" / "metrics.json").read_text())
-BMAP = json.loads((ROOT / "data" / "braille_map.json").read_text())
+M = _load_metrics(METRICS_PATH)
+BMAP = json.loads((ROOT / "data" / "braille_map.json").read_text(encoding="utf-8"))
 N_VERIFIED = sum(1 for l in BMAP["letters"] if l.get("verified"))
+N_TOTAL_LETTERS = len(BMAP["letters"])
 PARAMS = M["params"]
-TFLITE_B = M["tflite_bytes"]
-TEACH_ACC = M["test"]["teaching_combined"]
-CONF_ACC = M["test"]["confidence_combined"]
+TFLITE_B = M["bytes"]                  # kept as bytes-on-device, name kept for callers below
+TEACH_ACC = M["teach_acc"]
+CONF_ACC = M["conf_acc"]
+N_FEATURES_MODEL = M["n_features_model"]
+DATA_REAL, DATA_SYNTH, DATA_TOTAL = M["real"], M["synthetic"], M["total"]
+
+TA_CLASSES = ["REPEAT", "HINT", "NORMAL_PRACTICE"]
+CS_CLASSES = ["CONFIDENT", "HESITANT", "GUESSING"]
 
 BUILT, PLANNED = "BUILT", "PLANNED"
 
@@ -58,7 +122,7 @@ def d01_overview():
         ("2", "DATABASE", DATA, BUILT,
          ["Supabase stores 14", "features and 2 labels", "for every attempt"]),
         ("3", "TinyML MODEL", MODEL, BUILT,
-         [f"{PARAMS:,} parameters", f"{TFLITE_B:,} bytes after", "int8 quantization"]),
+         [f"{PARAMS:,} parameters", f"{TFLITE_B:,} bytes as", "plain C float arrays"]),
         ("4", "ESP32 DEVICE", HW, PLANNED,
          ["Runs fully offline.", "Speaker, 6 buttons", "and 6 vibration motors"]),
         ("5", "MOBILE APP", APP, PLANNED,
@@ -80,7 +144,7 @@ def d01_overview():
             s.arrow(x + bw + 3, y + bh / 2, x + bw + gap - 4, y + bh / 2, color=LINE, sw=3)
 
     # what travels along each hop
-    flows = ["real learner attempts", "CSV export", "model.tflite → C header", "session logs (SD card)"]
+    flows = ["real learner attempts", "CSV export", "trained weights → C header", "session logs (SD card)"]
     for i, f in enumerate(flows):
         x = x0 + (i + 1) * (bw + gap) - gap / 2
         s.text(x, y + bh + 34, f, 12.5, "normal", MUTED, "middle")
@@ -215,32 +279,36 @@ def d03_features():
     ], 14.5, 21, INK)
 
     # outputs
-    s.rect(1006, TOP, 534, 300, fill=TINT[MODEL], stroke=MODEL, sw=2.5)
+    s.rect(1006, TOP, 534, 175, fill=TINT[MODEL], stroke=MODEL, sw=2.5)
     s.text(1030, TOP + 36, "OUTPUT 1 — TEACHING ACTION", 15, "bold", MODEL)
-    s.text(1030, TOP + 60, "6 classes", 13.5, "normal", MUTED)
-    acts = ["Repeat", "Hint", "Normal practice",
-            "Increase difficulty", "Review previous", "Word practice"]
-    for i, a in enumerate(acts):
-        cx, cy = 1030 + (i % 2) * 258, TOP + 82 + (i // 2) * 68
-        s.rect(cx, cy, 242, 52, fill=WHITE, stroke=MODEL, sw=1.5, r=10)
-        s.text(cx + 121, cy + 33, a, 15, "bold", INK, "middle")
-
-    s.rect(1006, TOP + 330, 534, 175, fill=TINT[APP], stroke=APP, sw=2.5)
-    s.text(1030, TOP + 366, "OUTPUT 2 — CONFIDENCE STATE", 15, "bold", APP)
-    s.text(1030, TOP + 390, "3 classes", 13.5, "normal", MUTED)
-    for i, c in enumerate(["Confident", "Hesitant", "Guessing"]):
+    s.text(1030, TOP + 60, "3 classes", 13.5, "normal", MUTED)
+    for i, a in enumerate(["Repeat", "Hint", "Normal Practice"]):
         cx = 1030 + i * 172
-        s.rect(cx, TOP + 408, 158, 48, fill=WHITE, stroke=APP, sw=1.5, r=10)
-        s.text(cx + 79, TOP + 439, c, 15, "bold", INK, "middle")
-    s.text(1030, TOP + 486, "Inferred from speed, retries and hesitation.", 14, "normal", MUTED)
+        s.rect(cx, TOP + 78, 158, 48, fill=WHITE, stroke=MODEL, sw=1.5, r=10)
+        s.text(cx + 79, TOP + 109, a, 14.5, "bold", INK, "middle")
+    s.text(1030, TOP + 156, "Down from 6 — the other 3 were retired in spec v2",
+           12.5, "normal", MUTED)
 
-    s.rect(1006, TOP + 535, 534, 115, fill=WHITE, stroke=LINE, sw=2)
-    s.lines(1030, TOP + 573, [
-        "Both heads share one trunk: a single",
-        "network gives two answers from one",
-        "inference. That is what keeps it small",
-        "enough for a microcontroller.",
-    ], 14.5, 24, MUTED)
+    s.rect(1006, TOP + 205, 534, 175, fill=TINT[APP], stroke=APP, sw=2.5)
+    s.text(1030, TOP + 241, "OUTPUT 2 — CONFIDENCE STATE", 15, "bold", APP)
+    s.text(1030, TOP + 265, "3 classes", 13.5, "normal", MUTED)
+    for i, c in enumerate(CS_CLASSES):
+        cx = 1030 + i * 172
+        s.rect(cx, TOP + 283, 158, 48, fill=WHITE, stroke=APP, sw=1.5, r=10)
+        s.text(cx + 79, TOP + 314, c.title(), 15, "bold", INK, "middle")
+    s.text(1030, TOP + 361, "Inferred from speed, retries and hesitation.", 14, "normal", MUTED)
+
+    s.rect(1006, TOP + 410, 534, 240, fill=WHITE, stroke=LINE, sw=2)
+    s.lines(1030, TOP + 448, [
+        "Two independent networks, not a",
+        "shared trunk: TA and CS are each",
+        f"their own Input({N_FEATURES_MODEL})→32→16→3",
+        "MLP, trained separately in scikit-learn.",
+        "",
+        f"{PARAMS:,} parameters combined ({PARAMS//2:,} each)",
+        "is still small enough that running both",
+        "costs under a millisecond together.",
+    ], 14.5, 23, MUTED)
 
     s.footnote("Feature scaling uses fixed ranges from the spec, never dataset statistics — so retraining can never desynchronise the device from the model.")
     return s, "03_features_and_labels"
@@ -254,11 +322,11 @@ def d04_data_pipeline():
              BUILT, OK)
 
     s.card(60, TOP, 340, 230, "1.  Learner sessions", [
-        "10–20 volunteers",
+        "4 volunteers (P01–P04)",
         "Short sessions, spread",
         "across several days",
         "",
-        "Target: about 400 real rows",
+        f"Collected: {DATA_REAL:,} real rows",
     ], SIM)
     s.arrow(405, TOP + 115, 455, TOP + 115, color=LINE, sw=3)
 
@@ -289,17 +357,20 @@ def d04_data_pipeline():
     ], MODEL)
     s.elbow(1030, TOP + 233, 830, TOP + 273, color=MODEL, sw=2.5, via_y=TOP + 254)
 
-    # target mix
+    # actual mix achieved
+    real_pct = round(100 * DATA_REAL / DATA_TOTAL)
+    synth_pct = 100 - real_pct
     s.rect(60, TOP + 275, 340, 215, fill=WHITE, stroke=LINE, sw=2)
-    s.text(84, TOP + 311, "TARGET MIX", 15, "bold", MUTED)
+    s.text(84, TOP + 311, "ACTUAL MIX — COLLECTION COMPLETE", 14, "bold", MUTED)
     s.rect(84, TOP + 335, 120, 54, fill=TINT[SIM], stroke=SIM, sw=2, r=8)
-    s.text(144, TOP + 369, "40% real", 17, "bold", SIM, "middle")
+    s.text(144, TOP + 369, f"{real_pct}% real", 17, "bold", SIM, "middle")
     s.rect(216, TOP + 335, 160, 54, fill=TINT[MODEL], stroke=MODEL, sw=2, r=8)
-    s.text(296, TOP + 369, "60% synthetic", 17, "bold", MODEL, "middle")
+    s.text(296, TOP + 369, f"{synth_pct}% synthetic", 17, "bold", MODEL, "middle")
     s.lines(84, TOP + 418, [
-        "Synthetic data fills the rare",
-        "teaching actions that seldom",
-        "occur in natural practice.",
+        f"{DATA_REAL:,} real + {DATA_SYNTH:,} synthetic",
+        f"= {DATA_TOTAL:,} rows. Synthetic tops up",
+        "actions that need deliberately",
+        "induced mistakes to occur at all.",
     ], 14, 22, MUTED)
 
     s.rect(1230, TOP, 310, 490, fill=TINT[WARN], stroke=WARN, sw=2.5)
@@ -326,8 +397,8 @@ def d04_data_pipeline():
     s.rect(60, TOP + 520, 1480, 130, fill=WHITE, stroke=INK, sw=2.5)
     s.text(84, TOP + 556, "FILLING THE RARE CLASSES HONESTLY", 16, "bold", INK)
     s.lines(84, TOP + 588, [
-        "\"Increase difficulty\" needs high mastery and a long correct streak, so simulating more struggling learners can never produce it,",
-        "however long it runs. Those classes are topped up with a strong learner drilling a small set of letters — a scenario that genuinely triggers them.",
+        "REPEAT and HINT only fire after a wrong answer, so a simulated population that mostly answers correctly under-produces both —",
+        "synthetic sessions include deliberately struggling virtual learners to reach them, a scenario that genuinely triggers those actions.",
     ], 14.5, 23, MUTED)
 
     s.footnote("No label is ever edited after the fact. Rare classes are produced by scenarios that legitimately cause them.")
@@ -338,78 +409,79 @@ def d04_data_pipeline():
 def d05_model():
     s = Svg(title="TinyML model architecture")
     s.header("TinyML model architecture",
-             f"Multi-task network — {PARAMS:,} trainable parameters", BUILT, OK)
+             f"Two independent networks — {PARAMS:,} trainable parameters combined", BUILT, OK)
 
-    def dots_col(x, y, n, color, spacing=26):
+    per_net = PARAMS // 2
+    p_in = N_FEATURES_MODEL * 32 + 32
+    p_h1 = 32 * 16 + 16
+    p_out = 16 * 3 + 3
+
+    def dots_col(x, y, n, color, spacing=16):
         for i in range(n):
-            s.circle(x, y + i * spacing, 8, fill=color, stroke=color)
-        # three small dots to indicate "more units" -- drawn, never a glyph
+            s.circle(x, y + i * spacing, 6, fill=color, stroke=color)
         for i in range(3):
-            s.circle(x, y + n * spacing + 10 + i * 11, 2.6, fill=color, stroke=color)
+            s.circle(x, y + n * spacing + 7 + i * 8, 2.2, fill=color, stroke=color)
 
-    y0 = TOP + 20
-    LH = 380
+    LH = 240
+    y0 = TOP + 30
 
-    def layer(x, w, title, sub, color, nodes, params=None):
-        s.rect(x, y0, w, LH, fill=TINT[color], stroke=color, sw=2.5)
-        s.text(x + w / 2, y0 + 42, title, 19, "bold", INK, "middle")
-        s.text(x + w / 2, y0 + 68, sub, 14, "normal", MUTED, "middle")
-        dots_col(x + w / 2, y0 + 106, nodes, color)
-        if params:
-            s.text(x + w / 2, y0 + LH - 22, params, 14, "bold", color, "middle")
+    def net_col(col_x, label, color, tag):
+        s.text(col_x, y0 - 12, label, 14.5, "bold", color)
+        s.chip(col_x + 555, y0 - 30, f"{per_net} params", color, 11, 8, 20)
 
-    layer(60, 215, "INPUT", "14 features", DATA, 7)
-    s.arrow(280, y0 + LH / 2, 330, y0 + LH / 2, color=LINE, sw=3)
-    layer(335, 215, "DENSE 32", "ReLU", MODEL, 7, "480 params")
-    s.arrow(555, y0 + LH / 2, 605, y0 + LH / 2, color=LINE, sw=3)
-    layer(610, 215, "DENSE 16", "ReLU", MODEL, 6, "528 params")
+        def layer(x, w, title, sub, nodes, params=None):
+            s.rect(x, y0, w, LH, fill=TINT[color], stroke=color, sw=2.5)
+            s.text(x + w / 2, y0 + 30, title, 14.5, "bold", INK, "middle")
+            s.text(x + w / 2, y0 + 50, sub, 11.5, "normal", MUTED, "middle")
+            dots_col(x + w / 2, y0 + 78, nodes, color)
+            if params:
+                s.text(x + w / 2, y0 + LH - 14, params, 12, "bold", color, "middle")
 
-    # split into two heads
-    mid = y0 + LH / 2
-    s.path(f"M 830 {mid} L 875 {mid} L 875 {y0 + 80} L 915 {y0 + 80}", stroke=LINE, sw=3)
-    s.path(f"M 830 {mid} L 875 {mid} L 875 {y0 + 290} L 915 {y0 + 290}", stroke=LINE, sw=3)
+        layer(col_x, 120, "IN", f"{N_FEATURES_MODEL} feat.", 5)
+        s.arrow(col_x + 120 + 4, y0 + LH / 2, col_x + 160, y0 + LH / 2, color=LINE, sw=2.5)
+        layer(col_x + 164, 175, "DENSE 32", "ReLU", 5, f"{p_in}p")
+        s.arrow(col_x + 164 + 175 + 4, y0 + LH / 2, col_x + 347, y0 + LH / 2, color=LINE, sw=2.5)
+        layer(col_x + 351, 160, "DENSE 16", "ReLU", 5, f"{p_h1}p")
+        s.arrow(col_x + 351 + 160 + 4, y0 + LH / 2, col_x + 519, y0 + LH / 2, color=LINE, sw=2.5)
+        layer(col_x + 523, 160, "DENSE 3", f"softmax · {tag}", 3, f"{p_out}p")
 
-    s.rect(920, y0 + 30, 265, 100, fill=TINT[APP], stroke=APP, sw=2.5)
-    s.text(1052, y0 + 66, "DENSE 3 — softmax", 16.5, "bold", INK, "middle")
-    s.text(1052, y0 + 92, "confidence state", 14, "normal", MUTED, "middle")
-    s.text(1052, y0 + 114, "51 params", 13.5, "bold", APP, "middle")
+    net_col(60, "TEACHING-ACTION NETWORK (TA)", MODEL, "teaching")
+    net_col(830, "CONFIDENCE-STATE NETWORK (CS)", APP, "confidence")
 
-    s.rect(920, y0 + 240, 265, 100, fill=TINT[MODEL], stroke=MODEL, sw=2.5)
-    s.text(1052, y0 + 276, "DENSE 6 — softmax", 16.5, "bold", INK, "middle")
-    s.text(1052, y0 + 302, "teaching action", 14, "normal", MUTED, "middle")
-    s.text(1052, y0 + 324, "102 params", 13.5, "bold", MODEL, "middle")
+    s.text(60, y0 + LH + 34,
+           "Same shape, trained independently — inputs are shared, weights are not. Both run on every attempt; neither depends on the other's output.",
+           14.5, "normal", MUTED)
 
-    # measured numbers
-    s.rect(1225, y0, 315, LH, fill=WHITE, stroke=LINE, sw=2)
-    s.text(1249, y0 + 38, "MEASURED", 15, "bold", MUTED)
-    rows = [
-        ("Trainable parameters", f"{PARAMS:,}"),
-        ("Float32 model", "~4.6 KB"),
-        ("After int8 quantization", f"{TFLITE_B:,} B"),
-        ("Teaching accuracy", f"{TEACH_ACC*100:.1f}%"),
-        ("Confidence accuracy", f"{CONF_ACC*100:.1f}%"),
-        ("TFLite vs Keras match", "100%"),
-        ("Inference time", "< 1 ms"),
+    # measured numbers, as a single horizontal strip
+    my = y0 + LH + 66
+    s.rect(60, my, 1480, 110, fill=WHITE, stroke=LINE, sw=2)
+    stats = [
+        ("Parameters (both nets)", f"{PARAMS:,}"),
+        ("Exported as", "C float32 arrays"),
+        ("On-device weight size", f"{TFLITE_B:,} B"),
+        ("Teaching acc. (real)", f"{TEACH_ACC*100:.1f}%"),
+        ("Confidence acc. (real)", f"{CONF_ACC*100:.1f}%"),
+        ("Boot self-test", "20 / 20 match"),
+        ("Inference time", "~0.1 ms, both"),
         ("Training time", "< 30 s, CPU"),
     ]
-    for i, (k, v) in enumerate(rows):
-        yy = y0 + 82 + i * 38
-        s.text(1249, yy, k, 14, "normal", INK)
-        s.text(1516, yy, v, 14.5, "bold", MODEL, "end")
-        if i < len(rows) - 1:
-            s.line(1249, yy + 13, 1516, yy + 13, stroke="#EEF1F5", sw=1)
+    for i, (k, v) in enumerate(stats):
+        cx = 84 + (i % 4) * 365
+        cy = my + 34 + (i // 4) * 52
+        s.text(cx, cy, k, 12.5, "normal", MUTED)
+        s.text(cx, cy + 22, v, 16, "bold", MODEL)
 
     # honesty band
-    by = y0 + LH + 30
+    by = my + 130
     s.rect(60, by, 1480, 145, fill=TINT[WARN], stroke=WARN, sw=2.5)
     s.text(84, by + 36, "WHAT THIS MODEL ACTUALLY DOES — state this plainly in the report", 16.5, "bold", WARN)
     s.lines(84, by + 70, [
-        f"The training labels are produced by a hand-written rule engine, so the network learns to REPRODUCE that engine — measured at {TEACH_ACC*100:.1f}% agreement.",
-        f"That is a real TinyML achievement: an adaptive teaching policy compressed into {PARAMS:,} parameters that run offline on a low-cost microcontroller.",
+        f"The training labels are produced by a hand-written rule engine, so the networks learn to REPRODUCE that engine — measured at {TEACH_ACC*100:.1f}% / {CONF_ACC*100:.1f}% real-only agreement.",
+        f"That is a real embedded-ML result: an adaptive teaching policy compressed into {PARAMS:,} parameters ({TFLITE_B/1024:.1f} KB) that run offline on a $4 microcontroller, no runtime library.",
         "It is not autonomous discovery of teaching strategy and must not be described that way. The interesting evidence is where the model disagrees with the engine.",
     ], 15, 26, INK)
 
-    s.footnote("Quantization to int8 changed zero predictions on the test set — the deployed model is exactly the validated model.")
+    s.footnote("sklearn MLPClassifier, not TensorFlow (incompatible with Python 3.12 on Windows) — weights are exported directly as C arrays, no TFLite, no arena.")
     return s, "05_model_architecture"
 
 
@@ -419,19 +491,26 @@ def d06_esp32_fit():
     s.header("Does it fit on the ESP32?",
              "Memory, latency and offline operation — measured, not estimated", BUILT, OK)
 
-    # memory
+    # memory -- no TFLite runtime, no tensor arena: inference.h allocates two
+    # stack arrays (32 + 16 floats = 192 B) per forward pass and frees them
+    # immediately, so the only persistent cost is the exported weights.
+    SRAM_B = 520 * 1024
+    STACK_B = 192
+    used_b = TFLITE_B + STACK_B
+    free_kb = (SRAM_B - used_b) / 1024
+    pct = used_b / SRAM_B * 100
+
     s.rect(60, TOP, 940, 270, fill=WHITE, stroke=LINE, sw=2)
     s.text(84, TOP + 38, "SRAM USAGE — 520 KB available", 16, "bold", MUTED)
     bar_x, bar_y, bar_w, bar_h = 84, TOP + 66, 892, 62
     s.rect(bar_x, bar_y, bar_w, bar_h, fill="#F3F5F8", stroke=LINE, sw=2, r=8)
-    model_w = bar_w * (TFLITE_B / 1024) / 520
-    arena_w = bar_w * 8 / 520
-    s.rect(bar_x, bar_y, model_w + arena_w, bar_h, fill=MODEL, stroke=MODEL, sw=0, r=8)
-    s.text(bar_x + bar_w - 18, bar_y + 38, "free  ·  506 KB", 16, "bold", MUTED, "end")
-    s.legend(84, TOP + 162, [(f"Model {TFLITE_B:,} B", MODEL), ("Tensor arena 8 KB", HW),
-                             ("Free 506 KB", MUTED)])
+    used_w = bar_w * used_b / SRAM_B
+    s.rect(bar_x, bar_y, max(used_w, 4), bar_h, fill=MODEL, stroke=MODEL, sw=0, r=8)
+    s.text(bar_x + bar_w - 18, bar_y + 38, f"free  ·  {free_kb:.1f} KB", 16, "bold", MUTED, "end")
+    s.legend(84, TOP + 162, [(f"Weights {TFLITE_B:,} B", MODEL), (f"Forward-pass stack {STACK_B} B", HW),
+                             (f"Free {free_kb:.1f} KB", MUTED)])
     s.text(84, TOP + 218, "TOTAL USED", 14, "bold", MUTED)
-    s.text(300, TOP + 224, "13.8 KB   =   2.7% of SRAM", 26, "bold", MODEL)
+    s.text(300, TOP + 224, f"{used_b/1024:.1f} KB   =   {pct:.1f}% of SRAM", 26, "bold", MODEL)
 
     # why offline
     s.rect(60, TOP + 300, 940, 350, fill=TINT[OK], stroke=OK, sw=2.5)
@@ -451,9 +530,9 @@ def d06_esp32_fit():
 
     # stat cards
     stats = [
-        ("LATENCY", "< 1 ms", "per inference",
-         ["Two small dense layers.", "The audio prompt takes", "about 1000x longer."], MODEL),
-        ("FLASH", "~30 KB", "model + runtime",
+        ("LATENCY", "~0.1 ms", "both networks",
+         ["Two small dense nets, no", "runtime library. The audio", "prompt takes ~10,000x longer."], MODEL),
+        ("FLASH", "~30 KB", "weights + firmware",
          ["The ESP32 has 4 MB.", "Ample room for the model,", "audio index and logs."], HW),
         ("NETWORK", "NONE", "fully offline",
          ["WiFi and Bluetooth are", "switched off in firmware.", "No cloud, no data leaves."], OK),
@@ -466,7 +545,7 @@ def d06_esp32_fit():
         s.text(1054, y + 116, sub, 14, "normal", MUTED)
         s.lines(1256, y + 58, body, 13.5, 22, INK)
 
-    s.footnote("Golden test vectors from training are replayed on the device at boot — if the ESP32 disagrees with the desktop, it refuses to trust the model.")
+    s.footnote("20 golden test vectors from training are replayed on the device at boot — if the ESP32 disagrees with the desktop, it refuses to trust the model.")
     return s, "06_esp32_fit"
 
 
@@ -474,16 +553,16 @@ def d06_esp32_fit():
 def d07_deploy():
     s = Svg(title="Training to deployment")
     s.header("From CSV to a microcontroller",
-             "Five automated steps — no hand-copied numbers anywhere", BUILT, OK)
+             "Four automated steps — no hand-copied numbers anywhere", BUILT, OK)
 
     steps = [
-        ("CSV dataset", ["real + synthetic", "rows, audited"], DATA, "export_dataset.py"),
-        ("Keras model", [f"{PARAMS:,} parameters", "trained on CPU"], MODEL, "train.py"),
-        ("TFLite int8", [f"{TFLITE_B:,} bytes", "quantized"], MODEL, "converter"),
-        ("C header", ["model_data.h", "compiled in"], HW, "tflite_to_header.py"),
-        ("ESP32 flash", ["runs offline", "in under 1 ms"], HW, "Arduino IDE"),
+        ("CSV dataset", [f"{DATA_REAL:,} real + {DATA_SYNTH:,} synth", "rows, audited"], DATA, "export_dataset.py"),
+        ("sklearn MLP", [f"{PARAMS:,} parameters", "two heads trained on CPU"], MODEL, "train_and_export.py"),
+        ("C float export", [f"{TFLITE_B:,} bytes", "direct, no TFLite"], MODEL, "same script"),
+        ("ESP32 flash", ["model_weights.h", "compiled in, runs offline"], HW, "Arduino IDE"),
     ]
-    bw, gap = 262, 30
+    gap = 30
+    bw = (1480 - (len(steps) - 1) * gap) / len(steps)
     for i, (title, body, color, tool) in enumerate(steps):
         x = 60 + i * (bw + gap)
         s.rect(x, TOP + 20, bw, 210, fill=TINT[color], stroke=color, sw=2.5)
@@ -500,11 +579,11 @@ def d07_deploy():
     s.rect(60, TOP + 275, 740, 375, fill=TINT[OK], stroke=OK, sw=2.5)
     s.text(84, TOP + 313, "HOW WE KNOW THE DEVICE RUNS THE RIGHT MODEL", 16.5, "bold", OK)
     s.lines(84, TOP + 350, [
-        "During training, 12 test cases are saved together with the answers",
-        "the desktop computed for them. Those cases are compiled into the",
-        "firmware itself.",
+        "During training, 20 test cases (\"golden vectors\") are saved together",
+        "with the answers the desktop computed for them. Those cases are",
+        "compiled into the firmware itself.",
         "",
-        "At every boot the ESP32 runs all 12 and compares the results.",
+        "At every boot the ESP32 runs all 20 and compares the results.",
     ], 15.5, 27, INK)
     s.rect(84, TOP + 500, 330, 50, fill=WHITE, stroke=OK, sw=2, r=8)
     s.text(249, TOP + 531, "match  →  use the model", 15.5, "bold", OK, "middle")
@@ -530,7 +609,7 @@ def d07_deploy():
         s.text(979, y + 28, lang, 15, "bold", INK, "middle")
         s.text(1130, y + 28, "→   " + where, 15, "normal", MUTED)
     s.rect(854, TOP + 585, 660, 44, fill=WHITE, stroke=WARN, sw=2, r=8)
-    s.text(1184, TOP + 613, "A test pushes 3,000 cases through all three and proves they agree",
+    s.text(1184, TOP + 613, "test_parity.py pushes 2,000 vectors through all three and proves they agree",
            14.5, "bold", WARN, "middle")
 
     s.footnote("This removes the failure where the browser and the device compute features slightly differently — invisible until integration, expensive to find then.")
@@ -541,7 +620,7 @@ def d07_deploy():
 def d08_hardware():
     s = Svg(title="Hardware architecture")
     s.header("Hardware architecture",
-             "ESP32 with spoken output, 6-key Braille input and 6-motor tactile feedback",
+             "Firmware complete; breadboard subset (buttons + speaker) wired — full motor/DFPlayer assembly pending",
              PLANNED, WARN)
 
     # MCU
@@ -550,7 +629,7 @@ def d08_hardware():
     s.text(800, TOP + 218, "240 MHz dual core", 14.5, "normal", MUTED, "middle")
     s.text(800, TOP + 242, "520 KB SRAM  ·  4 MB flash", 14.5, "normal", MUTED, "middle")
     s.rect(650, TOP + 264, 300, 50, fill=WHITE, stroke=MODEL, sw=2, r=8)
-    s.text(800, TOP + 295, f"TFLite Micro  ·  {TFLITE_B:,} B model", 14.5, "bold", MODEL, "middle")
+    s.text(800, TOP + 295, f"Direct C inference  ·  {TFLITE_B:,} B", 14.5, "bold", MODEL, "middle")
     s.rect(650, TOP + 326, 300, 50, fill=WHITE, stroke=OK, sw=2, r=8)
     s.text(800, TOP + 357, "WiFi OFF  ·  Bluetooth OFF", 14.5, "bold", OK, "middle")
 
@@ -657,7 +736,7 @@ def d09_interaction():
         ("Audio", "ভুল", "— then the letter is spoken again"),
         ("Motors", None, "the CORRECT dots buzz one at a time"),
         ("Model", None, "mastery falls, wrong streak increases"),
-        ("Next", None, "the model picks: repeat, hint, or go back"),
+        ("Next", None, "the engine picks: repeat, or a hint"),
     ]
     for i, (k, bn, v) in enumerate(wrong):
         y = TOP + 360 + i * 68
@@ -676,43 +755,66 @@ def d09_interaction():
 # ===========================================================================
 def d10_actions():
     s = Svg(title="Teaching actions and their origin")
-    s.header("The six teaching actions, and where they come from",
-             "Written as explicit rules first, then learned by the network", BUILT, OK)
+    s.header("The three teaching actions, and where they come from",
+             "Ordered rules, first match wins — written explicitly, then learned by the network", BUILT, OK)
 
     actions = [
-        ("REPEAT", "The answer was wrong, but the learner is not stuck yet.",
-         "wrong streak >= 1", BAD),
-        ("HINT", "Two or more retries with no hint used — reveal the dot count.",
-         "retries >= 2  and  hints = 0", WARN),
-        ("NORMAL PRACTICE", "Nothing unusual is happening. Continue as normal.",
-         "default case", MUTED),
-        ("INCREASE DIFFICULTY", "Doing well on this letter — raise the tier.",
-         "mastery >= 0.70  and  streak >= 3", OK),
-        ("REVIEW PREVIOUS", "Stuck, or a partly-learned letter has gone stale.",
-         "wrong streak >= 3, or stale and weak", SIM),
-        ("WORD PRACTICE", "The letter is solid — start using it inside words.",
-         "mastery >= 0.85  and  streak >= 5", MODEL),
+        ("1", "REPEAT",
+         ["First wrong attempt on this", "prompt — just try again,", "no help yet."],
+         ["wrong_streak >= 1  AND", "retry_count == 0"], BAD),
+        ("2", "HINT",
+         ["Still wrong after retrying —", "keep helping on THIS character", "every subsequent wrong try."],
+         ["wrong_streak >= 1", "(rule 1 already caught retry==0)"], WARN),
+        ("3", "NORMAL_PRACTICE",
+         ["wrong_streak == 0, so the", "attempt just scored was", "correct — move on normally."],
+         ["default — no conditions,", "falls through otherwise"], OK),
     ]
-    for i, (name, why, rule, color) in enumerate(actions):
-        x = 60 + (i % 2) * 760
-        y = TOP + (i // 2) * 148
-        s.rect(x, y, 720, 128, fill=TINT[color], stroke=color, sw=2.5)
-        s.text(x + 20, y + 36, name, 18, "bold", INK)
-        s.text(x + 20, y + 64, why, 14.5, "normal", MUTED)
-        s.rect(x + 20, y + 80, 430, 32, fill=WHITE, stroke=color, sw=1.5, r=16)
-        s.text(x + 235, y + 102, rule, 13.5, "bold", color, "middle")
+    bw, gap = 460, 40
+    for i, (order, name, why, rule, color) in enumerate(actions):
+        x = 60 + i * (bw + gap)
+        s.rect(x, TOP, bw, 250, fill=TINT[color], stroke=color, sw=2.5)
+        s.circle(x + 34, TOP + 40, 18, fill=color, stroke=color)
+        s.text(x + 34, TOP + 46, order, 16, "bold", WHITE, "middle")
+        s.text(x + 66, TOP + 46, name, 19, "bold", INK)
+        s.lines(x + 20, TOP + 90, why, 14, 22, MUTED)
+        s.rect(x + 20, TOP + 172, bw - 40, 58, fill=WHITE, stroke=color, sw=1.5, r=10)
+        s.lines(x + 32, TOP + 197, rule, 13, 21, color, weight="bold")
 
-    y = TOP + 3 * 148
+    s.text(60, TOP + 278, "Retired in spec v2: INCREASE_DIFFICULTY, REVIEW_PREVIOUS and WORD_PRACTICE — abandoning the current letter mid-struggle taught nothing about the letter the learner actually needed.",
+           13.5, "normal", MUTED, italic=True)
+
+    y = TOP + 320
     s.rect(60, y, 1480, 152, fill=WHITE, stroke=INK, sw=2.5)
     s.text(84, y + 38, "WHERE THESE DECISIONS COME FROM", 16.5, "bold", INK)
     s.circle(100, y + 74, 13, fill=SIM, stroke=SIM)
     s.text(100, y + 79, "1", 14, "bold", WHITE, "middle")
-    s.text(126, y + 79, "The rules are hand-written from teaching principles, and applied live while data is collected.", 15, "normal", INK)
+    s.text(126, y + 79, "The rules are hand-written from teaching principles (spec/engine_spec.json), and applied live while data is collected.", 15, "normal", INK)
     s.circle(100, y + 112, 13, fill=MODEL, stroke=MODEL)
     s.text(100, y + 117, "2", 14, "bold", WHITE, "middle")
-    s.text(126, y + 117, f"The network is trained on those decisions and reproduces them at {TEACH_ACC*100:.1f}% — small enough to run on the ESP32.", 15, "normal", INK)
+    s.text(126, y + 117, f"The TA network is trained on those decisions and reproduces them at {TEACH_ACC*100:.1f}% real-only — small enough to run on the ESP32.", 15, "normal", INK)
 
-    s.footnote(f"The model does not invent teaching strategy. It compresses an explicit policy into {PARAMS:,} parameters so it can run offline on a microcontroller.")
+    # worked example -- one learner drilling one letter, attempt by attempt
+    wy = y + 172
+    s.rect(60, wy, 1480, 148, fill=WHITE, stroke=LINE, sw=2)
+    s.text(84, wy + 32, "WORKED EXAMPLE — one learner, one letter, four attempts in a row", 16, "bold", INK)
+    example = [
+        ("Attempt 1", "wrong", "wrong_streak=1, retry_count=0", "REPEAT", BAD),
+        ("Attempt 2", "wrong (retry)", "wrong_streak=2, retry_count=1", "HINT", WARN),
+        ("Attempt 3", "wrong (retry)", "wrong_streak=3, retry_count=2", "HINT", WARN),
+        ("Attempt 4", "correct", "wrong_streak=0, current_streak=1", "NORMAL_PRACTICE", OK),
+    ]
+    bw2, gap2 = 335, 25
+    for i, (label, result, state, action, color) in enumerate(example):
+        x = 84 + i * (bw2 + gap2)
+        s.rect(x, wy + 48, bw2, 88, fill=TINT[color], stroke=color, sw=2, r=10)
+        s.text(x + 16, wy + 70, f"{label} — {result}", 14, "bold", INK)
+        s.text(x + 16, wy + 92, state, 12, "normal", MUTED)
+        s.rect(x + 16, wy + 100, bw2 - 32, 28, fill=WHITE, stroke=color, sw=1.5, r=14)
+        s.text(x + bw2 / 2, wy + 119, action, 13, "bold", color, "middle")
+        if i < len(example) - 1:
+            s.arrow(x + bw2 + 3, wy + 92, x + bw2 + gap2 - 4, wy + 92, color=LINE, sw=2.5)
+
+    s.footnote(f"The model does not invent teaching strategy. It compresses an explicit policy into a {PARAMS//2}-parameter network so it can run offline on a microcontroller.")
     return s, "10_teaching_actions"
 
 
@@ -794,7 +896,7 @@ def d11_mobile():
 def d12_status():
     s = Svg(title="Project status and roadmap")
     s.header("Where the project stands today",
-             "Honest status of every stage — built, partly done, or not started")
+             "Honest status of every stage — data collection and verification are now done")
 
     # (text, is_continuation) -- a continuation line is indented and gets no
     # bullet. Deciding that from the text itself proved unreliable.
@@ -805,31 +907,36 @@ def d12_status():
             (B, "Supabase database and schema"),
             (B, "Rule engine in three languages"),
             (B, "Synthetic data generator"),
-            (B, "Training pipeline"),
-            (B, "int8 TFLite conversion"),
+            (B, f"Real data collected — {DATA_REAL:,} rows"),
+            (B, "Model trained on real + synthetic"),
+            (C, f"{TEACH_ACC*100:.1f}% / {CONF_ACC*100:.1f}% real-only acc."),
+            (B, f"Braille map — {N_VERIFIED} of {N_TOTAL_LETTERS} verified"),
             (B, "ESP32 firmware (written)"),
             (B, "Six hardware bring-up sketches"),
-            (B, "Four automated test suites"),
+            (B, "Automated test suites"),
             (B, "Braille image importer"),
         ]),
         ("PARTLY DONE", WARN, [
-            (B, f"Braille map: {N_VERIFIED} of 50 letters"),
-            (C, "verified from reference images"),
+            (B, "Physical assembly — breadboard"),
+            (C, "subset only: buttons + speaker."),
+            (C, "Motors, DFPlayer, full wiring"),
+            (C, "not yet assembled"),
             (GAP, ""),
             (B, "Audio: 60 clips generated by"),
-            (C, "speech synthesis — usable now,"),
-            (C, "but should be re-recorded by a"),
-            (C, "human speaker before any demo"),
+            (C, "speech synthesis (espeak-ng) —"),
+            (C, "usable now, should be re-recorded"),
+            (C, "by a human speaker before a demo"),
         ]),
-        ("NOT STARTED", BAD, [
-            (B, "Real learner data collection"),
-            (C, "— this is the critical path"),
-            (GAP, ""),
-            (B, "Physical hardware assembly"),
+        ("PLANNED", BAD, [
+            (B, "Full physical hardware assembly"),
+            (C, "— wiring all 6 motors + DFPlayer"),
             (GAP, ""),
             (B, "Teacher mobile app"),
+            (C, "(web teacher panel exists; a"),
+            (C, "dedicated mobile app does not)"),
             (GAP, ""),
-            (B, "39 consonant reference images"),
+            (B, "Human-recorded audio"),
+            (C, "to replace synthetic speech"),
         ]),
     ]
     for i, (title, color, items) in enumerate(cols):
@@ -840,26 +947,298 @@ def d12_status():
             if kind is GAP:
                 continue
             prefix, indent = ("•  ", 0) if kind == B else ("", 20)
-            s.text(x + 22 + indent, TOP + 82 + row * 32, prefix + txt, 14.5, "normal", INK)
+            s.text(x + 22 + indent, TOP + 82 + row * 30, prefix + txt, 13.5, "normal", INK)
 
     s.rect(60, TOP + 480, 1480, 170, fill=WHITE, stroke=INK, sw=2.5)
-    s.text(84, TOP + 518, "THE CRITICAL PATH", 17, "bold", INK)
+    s.text(84, TOP + 518, "THE CRITICAL PATH NOW", 17, "bold", INK)
     s.lines(84, TOP + 554, [
-        "Data collection needs CALENDAR TIME, not effort. Each learner must practise on different days, or two of the",
-        "14 features — session number and time since last practice — carry no signal whatsoever.",
+        f"The hard, calendar-bound work is done: {DATA_REAL:,} real rows across 4 volunteers, all {N_TOTAL_LETTERS} Braille letters verified against the Bangladesh standard, and the",
+        f"model retrained to {TEACH_ACC*100:.1f}% / {CONF_ACC*100:.1f}% real-only accuracy. What is left is assembly and production work, not research risk.",
         "",
-        "Everything else (hardware, the mobile app, the remaining reference images) can proceed in parallel. Start collecting first.",
+        "Remaining: solder the full motor + DFPlayer wiring onto the breadboard subset, re-record audio with a human voice, and build the teacher mobile app.",
     ], 15.5, 27, INK)
 
     return s, "12_status_and_roadmap"
 
 
 # ===========================================================================
+def d13_literature():
+    s = Svg(title="Comparison with prior work")
+    s.header("Where this project sits against prior work",
+             "Three published Braille-learning devices, and what each one leaves undone")
+
+    rows = [
+        ("Kader et al. (2018)", "Self-Learning Braille Kit",
+         "6 actuators + audio; learning and practice modes.",
+         "Costly. No ML/AI — teaching is not adaptive.", MUTED),
+        ("Saikot & Sanim (2022)", "Refreshable Braille Display",
+         "Single-cell, 6 actuators, adjustable spacing, speech.",
+         "Expensive. No practice mode. No ML/AI.", MUTED),
+        ("Ma, Lai & Luo (2025)", "BrailleRhythm",
+         "Pressure-sensor sheet over Braille cards, real-time audio.",
+         "Not Bangla-focused. Doesn't test answers, retries or teach adaptively.", MUTED),
+        ("This project", "Bangla Braille Tutor",
+         "6-motor + audio haptic teaching, offline on a $4 ESP32.",
+         f"ML-driven teaching action + confidence classification ({TEACH_ACC*100:.1f}%/{CONF_ACC*100:.1f}% real-only). {DATA_REAL:,} real learner rows collected.", OK),
+    ]
+
+    col_x = [60, 330, 610, 1080]
+    col_w = [260, 270, 460, 460]
+    headers = ["WORK", "APPROACH", "WHAT IT DOES", "GAP / WHAT'S DIFFERENT HERE"]
+    hy = TOP
+    for cx, cw, h in zip(col_x, col_w, headers):
+        s.text(cx, hy, h, 12.5, "bold", MUTED)
+    s.line(60, hy + 14, 1540, hy + 14, stroke=LINE, sw=1.5)
+
+    row_h = 140
+    for i, (name, product, does, gap, accent) in enumerate(rows):
+        y = TOP + 34 + i * row_h
+        color = OK if i == len(rows) - 1 else LINE
+        fill = TINT[OK] if i == len(rows) - 1 else WHITE
+        s.rect(60, y, 1480, row_h - 14, fill=fill, stroke=color, sw=2.5 if i == len(rows) - 1 else 1.5)
+        s.text(col_x[0] + 20, y + 34, name, 15, "bold", INK)
+        s.text(col_x[1] + 6, y + 34, product, 14, "bold", (OK if i == len(rows) - 1 else MUTED))
+        s.lines(col_x[2] + 6, y + 30, _wrap(does, 44), 13.5, 20, INK)
+        s.lines(col_x[3] + 6, y + 30, _wrap(gap, 46), 13.5, 20, (OK if i == len(rows) - 1 else BAD) if i < len(rows) - 1 else INK)
+
+    s.footnote("Gaps for prior work are as reported by their own authors; this row's figures are measured from the current build (see 05_model_architecture, 06_esp32_fit).")
+    return s, "13_literature_comparison"
+
+
+def _wrap(text, width):
+    """Greedy word-wrap for the small text-table cells above."""
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        trial = (cur + " " + w).strip()
+        if len(trial) > width and cur:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+# ===========================================================================
+def d14_bom_cost():
+    s = Svg(title="Bill of materials and estimated cost")
+    s.header("Bill of materials — estimated cost",
+             "Retail estimates for Bangladesh, BDT and USD — approximate, not vendor quotes", BUILT, OK)
+
+    BDT_PER_USD = 118  # approximate, for scale only -- not a live exchange rate
+    items = [
+        ("ESP32-WROOM-32 dev board", 1, 450),
+        ("DFPlayer Mini + 3 W speaker", 1, 260),
+        ("ULN2803A driver IC", 1, 25),
+        ("Coin vibration motors", 6, 30),
+        ("Tactile buttons (6 dot + 1 submit)", 7, 5),
+        ("microSD module", 1, 90),
+        ("5 V 2 A power supply", 1, 150),
+        ("1000 µF capacitor", 1, 10),
+        ("Resistors (6×1kΩ + 3×10kΩ)", 9, 1),
+        ("DS3231 RTC (optional)", 1, 120),
+    ]
+
+    hy = TOP
+    headers = ["COMPONENT", "QTY", "UNIT (BDT)", "SUBTOTAL (BDT)", "SUBTOTAL (USD)"]
+    hx = [60, 780, 900, 1080, 1300]
+    for x, h in zip(hx, headers):
+        s.text(x, hy, h, 12.5, "bold", MUTED)
+    s.line(60, hy + 14, 1540, hy + 14, stroke=LINE, sw=1.5)
+
+    row_h = 34
+    total_bdt = 0
+    total_bdt_no_rtc = 0
+    for i, (name, qty, unit_bdt) in enumerate(items):
+        y = TOP + 40 + i * row_h
+        sub = qty * unit_bdt
+        total_bdt += sub
+        if "RTC" not in name:
+            total_bdt_no_rtc += sub
+        if i % 2 == 0:
+            s.rect(60, y - 22, 1480, row_h, fill="#FAFBFC", stroke="none", sw=0)
+        s.text(hx[0], y, name, 14, "normal", INK)
+        s.text(hx[1] + 20, y, str(qty), 14, "normal", MUTED, "middle")
+        s.text(hx[2] + 40, y, f"{unit_bdt:,}", 14, "normal", MUTED, "middle")
+        s.text(hx[3] + 50, y, f"{sub:,}", 14, "bold", INK, "middle")
+        s.text(hx[4] + 40, y, f"${sub / BDT_PER_USD:.2f}", 14, "normal", MUTED, "middle")
+
+    ty = TOP + 40 + len(items) * row_h + 12
+    s.line(60, ty - 20, 1540, ty - 20, stroke=INK, sw=2)
+    s.text(hx[0], ty, "TOTAL (core build, no RTC)", 15, "bold", INK)
+    s.text(hx[3] + 50, ty, f"{total_bdt_no_rtc:,} BDT", 15.5, "bold", MODEL, "middle")
+    s.text(hx[4] + 40, ty, f"≈ ${total_bdt_no_rtc / BDT_PER_USD:.2f}", 14.5, "bold", MODEL, "middle")
+    s.text(hx[0], ty + 34, "TOTAL (with optional DS3231 RTC)", 15, "bold", INK)
+    s.text(hx[3] + 50, ty + 34, f"{total_bdt:,} BDT", 15.5, "bold", MODEL, "middle")
+    s.text(hx[4] + 40, ty + 34, f"≈ ${total_bdt / BDT_PER_USD:.2f}", 14.5, "bold", MODEL, "middle")
+
+    by = ty + 90
+    s.rect(60, by, 1480, 130, fill=TINT[WARN], stroke=WARN, sw=2.5)
+    s.text(84, by + 34, "THESE ARE ESTIMATES, NOT QUOTES", 15.5, "bold", WARN)
+    s.lines(84, by + 66, [
+        f"Unit prices are approximate current Bangladeshi retail/hobbyist-market figures (≈{BDT_PER_USD} BDT/USD used for scale only) — they move with",
+        "vendor, quantity and import duty, and are not claimed to be precise to the taka. Get current quotes before ordering for a build.",
+    ], 14, 22, INK)
+
+    s.footnote("Matches the component list in README.md 'Hardware'. Excludes wire, solder, enclosure and shipping.")
+    return s, "14_bom_cost"
+
+
+# ===========================================================================
+def d15_teaching_flow():
+    s = Svg(title="Teaching action and confidence decision flow")
+    s.header("How wrong_streak and retries drive the two decisions",
+             "Exact thresholds from spec/engine_spec.json — first match wins, top to bottom", BUILT, OK)
+
+    # svgkit has no centered multi-line text primitive, so diamonds use this.
+    def centered(cx, cy, lines, color, size=13):
+        n = len(lines)
+        for i, ln in enumerate(lines):
+            s.text(cx, cy - (n - 1) * 8 + i * 16, ln, size, "bold", color, "middle")
+
+    def diamond(cx, cy, w, h, text, color):
+        s.path(f"M {cx} {cy-h} L {cx+w} {cy} L {cx} {cy+h} L {cx-w} {cy} Z",
+               stroke=color, sw=2.5, fill=TINT[MUTED], marker=False)
+        centered(cx, cy, text, INK, 12.5)
+
+    def varrow(x, y1, y2, text):
+        # a plain vertical arrow with its yes/no label offset to the side --
+        # centering the label ON the line put it right on the diamond's
+        # sharp bottom vertex, which pierced the text.
+        s.arrow(x, y1, x, y2, color=LINE, sw=2.5)
+        s.text(x + 14, (y1 + y2) / 2 + 5, text, 12.5, "bold", MUTED)
+
+    # ---- left: teaching action ----
+    lx = 430
+    s.text(lx, TOP - 4, "TEACHING ACTION  (from wrong_streak, retry_count)", 14.5, "bold", MODEL, "middle")
+    s.rect(lx - 110, TOP + 20, 220, 46, fill=WHITE, stroke=INK, sw=2, r=23)
+    s.text(lx, TOP + 48, "attempt just scored", 14, "bold", INK, "middle")
+    s.arrow(lx, TOP + 66, lx, TOP + 104, color=LINE, sw=2.5)
+    diamond(lx, TOP + 150, 150, 46, ["wrong_streak >= 1 ?"], INK)
+    varrow(lx, TOP + 196, TOP + 234, "no")
+    s.rect(lx - 130, TOP + 234, 260, 56, fill=TINT[OK], stroke=OK, sw=2.5, r=10)
+    centered(lx, TOP + 264, ["NORMAL_PRACTICE"], OK, 15)
+    s.arrow(lx + 150, TOP + 150, lx + 230, TOP + 150, color=LINE, sw=2.5, label="yes")
+    diamond(lx + 380, TOP + 150, 140, 46, ["retry_count == 0 ?"], INK)
+    varrow(lx + 380, TOP + 196, TOP + 234, "yes")
+    s.rect(lx + 250, TOP + 234, 260, 56, fill=TINT[BAD], stroke=BAD, sw=2.5, r=10)
+    centered(lx + 380, TOP + 264, ["REPEAT"], BAD, 15)
+    s.arrow(lx + 520, TOP + 150, lx + 646, TOP + 150, color=LINE, sw=2.5, label="no")
+    s.rect(lx + 650, TOP + 122, 260, 56, fill=TINT[WARN], stroke=WARN, sw=2.5, r=10)
+    centered(lx + 780, TOP + 152, ["HINT"], WARN, 15)
+
+    # ---- right, lower band: confidence state ----
+    cy0 = TOP + 380
+    s.text(lx, cy0 - 24, "CONFIDENCE STATE  (from retries, response_time, press_duration, wrong_streak)",
+           14.5, "bold", APP, "middle")
+    diamond(lx, cy0 + 30, 190, 50, ["retry_count>=2  OR", "response_time>=6000ms ?"], INK)
+    varrow(lx, cy0 + 80, cy0 + 118, "yes")
+    s.rect(lx - 130, cy0 + 118, 260, 56, fill=TINT[BAD], stroke=BAD, sw=2.5, r=10)
+    centered(lx, cy0 + 148, ["GUESSING"], BAD, 15)
+    s.arrow(lx + 190, cy0 + 30, lx + 260, cy0 + 30, color=LINE, sw=2.5, label="no")
+    diamond(lx + 470, cy0 + 30, 210, 60,
+            ["response_time<=2500  AND  retry==0", "AND wrong_streak==0 AND press<=400ms ?"], INK)
+    varrow(lx + 470, cy0 + 90, cy0 + 128, "yes")
+    s.rect(lx + 340, cy0 + 128, 260, 56, fill=TINT[OK], stroke=OK, sw=2.5, r=10)
+    centered(lx + 470, cy0 + 158, ["CONFIDENT"], OK, 15)
+    s.arrow(lx + 680, cy0 + 30, lx + 760, cy0 + 30, color=LINE, sw=2.5, label="no")
+    s.rect(lx + 760, cy0 + 2, 260, 56, fill=TINT[WARN], stroke=WARN, sw=2.5, r=10)
+    centered(lx + 890, cy0 + 32, ["HESITANT (default)"], WARN, 14)
+
+    s.footnote("Both decisions run independently on the same attempt — a GUESSING confidence state and a REPEAT action can, and often do, fire together.")
+    return s, "15_teaching_actions_flow"
+
+
+# ===========================================================================
+def d16_remote_dataflow():
+    s = Svg(title="Teacher-panel remote mode data flow")
+    s.header("Remote / cloud-connected mode — how data moves",
+             "No direct browser-to-ESP32 link — everything relays through two polled Supabase tables", BUILT, OK)
+
+    lanes = [(140, "TEACHER PANEL", APP), (800, "SUPABASE", DATA), (1400, "ESP32 (WiFi mode)", HW)]
+    for x, label, color in lanes:
+        s.text(x, TOP, label, 15, "bold", color, "middle")
+        s.line(x, TOP + 16, x, TOP + 50 + 7 * 70 + 20, stroke=LINE, sw=1.5, dash="4 6")
+
+    steps = [
+        (140, "Teacher selects letters,", "clicks Start", APP),
+        (800, "INSERT remote_commands", "{device_id, letter_id, command, test_index, test_total}", DATA),
+        (1400, "polled every ~250 ms;", "plays audio (+ vibration in Learn mode)", HW),
+        (1400, "waits for the physical dot", "buttons + SUBMIT — no web input path", HW),
+        (800, "INSERT attempts", "{char_id, entered/expected pattern, is_correct, response_time,", DATA),
+        (800, "", "retry_count, teaching_action, confidence_state, source: esp32}", DATA),
+        (140, "polled every ~200 ms;", "shows the result live, sends the next letter", APP),
+        (800, "after the last letter: INSERT", "test_sessions + student_weaknesses", DATA),
+    ]
+    y = TOP + 50
+    for x, l1, l2, color in steps:
+        s.circle(x, y, 5, fill=color, stroke=color)
+        s.text(x + 24 if x != 1400 else x - 24, y - 4, l1, 13.5, "bold", INK,
+                "start" if x != 1400 else "end")
+        if l2:
+            s.text(x + 24 if x != 1400 else x - 24, y + 16, l2, 12, "normal", MUTED,
+                    "start" if x != 1400 else "end")
+        y += 70
+    y -= 70  # step back to the last drawn row's y, not the post-loop cursor
+
+    s.text(60, y + 26, "test_index / test_total on remote_commands are only set for command: \"test\" rows — that's how the ESP32 knows its", 12.5, "normal", MUTED)
+    s.text(60, y + 46, "position in the teacher's batch and when to print the final score to Serial.", 12.5, "normal", MUTED)
+
+    s.footnote("Verbatim sequence from README.md 'How data moves'. Only one of t10_learning / t11_testing / t11_ml_test is flashed at a time.")
+    return s, "16_data_flow_remote_mode"
+
+
+def _find_edge():
+    import shutil as _sh
+    for c in [_sh.which("msedge"), _sh.which("msedge.exe"),
+              r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+              r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]:
+        if c and Path(c).exists():
+            return c
+    return None
+
+
+def _svg_to_png(svg_path, png_path, scale=1.5, timeout=25):
+    """cairosvg if it's importable and has a working native cairo (Linux/mac
+    CI); otherwise headless MS Edge (Windows dev boxes, no cairo needed)."""
+    svg_path, png_path = Path(svg_path), Path(png_path)
+    try:
+        import cairosvg
+        cairosvg.svg2png(url=str(svg_path), write_to=str(png_path),
+                         output_width=int(W * scale), output_height=int(H * scale),
+                         background_color="white")
+        return True
+    except Exception:
+        pass
+
+    edge = _find_edge()
+    if not edge:
+        return False
+    import subprocess
+    import time
+    if png_path.exists():
+        png_path.unlink()
+    url = "file:///" + str(svg_path.resolve()).replace("\\", "/").replace(" ", "%20")
+    subprocess.run(
+        [edge, "--headless=new", "--disable-gpu", "--no-sandbox",
+         f"--force-device-scale-factor={scale}", f"--screenshot={png_path}",
+         f"--window-size={W},{H}", url],
+        capture_output=True, timeout=timeout)
+    # --screenshot can return before the async write lands on disk.
+    deadline = time.time() + timeout
+    while time.time() < deadline and not png_path.exists():
+        time.sleep(0.25)
+    return png_path.exists()
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     builders = [d01_overview, d02_simulation, d03_features, d04_data_pipeline,
                 d05_model, d06_esp32_fit, d07_deploy, d08_hardware,
                 d09_interaction, d10_actions, d11_mobile, d12_status]
+    if INCLUDE_EXTRA:
+        builders += [d13_literature, d14_bom_cost, d15_teaching_flow, d16_remote_dataflow]
 
     made = []
     for b in builders:
@@ -867,18 +1246,17 @@ def main():
         svg.save(OUT / f"{name}.svg")
         made.append(name)
 
-    try:
-        import cairosvg
-        for name in made:
-            cairosvg.svg2png(url=str(OUT / f"{name}.svg"),
-                             write_to=str(OUT / f"{name}.png"),
-                             output_width=2400, output_height=1350,
-                             background_color="white")
-        extra = "  + PNG at 2400x1350"
-    except ImportError:
-        extra = "  (cairosvg not installed -- SVG only)"
+    ok, failed = [], []
+    for name in made:
+        if _svg_to_png(OUT / f"{name}.svg", OUT / f"{name}.png"):
+            ok.append(name)
+        else:
+            failed.append(name)
+    extra = "  + PNG at 2400x1350" if ok else "  (no SVG->PNG renderer available -- SVG only)"
+    if failed:
+        extra += f"  [{len(failed)} PNG(s) failed: {', '.join(failed)}]"
 
-    print(f"wrote {len(made)} diagram(s) to {OUT.relative_to(ROOT)}/{extra}")
+    print(f"wrote {len(made)} diagram(s) to {OUT}/{extra}")
     for name in made:
         print(f"  {name}")
     print("\nAll on a pure white background.")

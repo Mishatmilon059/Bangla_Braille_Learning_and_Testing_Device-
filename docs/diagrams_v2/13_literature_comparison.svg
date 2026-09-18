@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<title>Comparison with prior work</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="60" y="66" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#111827" text-anchor="start">Where this project sits against prior work</text>
+<text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="16.5" font-weight="normal" fill="#6B7280" text-anchor="start">Three published Braille-learning devices, and what each one leaves undone</text>
+<text x="60" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">WORK</text>
+<text x="330" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">APPROACH</text>
+<text x="610" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">WHAT IT DOES</text>
+<text x="1080" y="150" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="bold" fill="#6B7280" text-anchor="start">GAP / WHAT'S DIFFERENT HERE</text>
+<line x1="60" y1="164" x2="1540" y2="164" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="60" y="184" width="1480" height="126" rx="12" ry="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+<text x="80" y="218" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">Kader et al. (2018)</text>
+<text x="336" y="218" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#6B7280" text-anchor="start">Self-Learning Braille Kit</text>
+<text x="616" y="214" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">6 actuators + audio; learning and practice</text>
+<text x="616" y="234" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">modes.</text>
+<text x="1086" y="214" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#DC2626" text-anchor="start">Costly. No ML/AI — teaching is not adaptive.</text>
+<rect x="60" y="324" width="1480" height="126" rx="12" ry="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+<text x="80" y="358" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">Saikot &amp; Sanim (2022)</text>
+<text x="336" y="358" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#6B7280" text-anchor="start">Refreshable Braille Display</text>
+<text x="616" y="354" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">Single-cell, 6 actuators, adjustable</text>
+<text x="616" y="374" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">spacing, speech.</text>
+<text x="1086" y="354" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#DC2626" text-anchor="start">Expensive. No practice mode. No ML/AI.</text>
+<rect x="60" y="464" width="1480" height="126" rx="12" ry="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+<text x="80" y="498" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">Ma, Lai &amp; Luo (2025)</text>
+<text x="336" y="498" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#6B7280" text-anchor="start">BrailleRhythm</text>
+<text x="616" y="494" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">Pressure-sensor sheet over Braille cards,</text>
+<text x="616" y="514" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">real-time audio.</text>
+<text x="1086" y="494" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#DC2626" text-anchor="start">Not Bangla-focused. Doesn't test answers,</text>
+<text x="1086" y="514" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#DC2626" text-anchor="start">retries or teach adaptively.</text>
+<rect x="60" y="604" width="1480" height="126" rx="12" ry="12" fill="#ECFAF4" stroke="#059669" stroke-width="2.5"/>
+<text x="80" y="638" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#111827" text-anchor="start">This project</text>
+<text x="336" y="638" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#059669" text-anchor="start">Bangla Braille Tutor</text>
+<text x="616" y="634" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">6-motor + audio haptic teaching, offline on</text>
+<text x="616" y="654" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">a $4 ESP32.</text>
+<text x="1086" y="634" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">ML-driven teaching action + confidence</text>
+<text x="1086" y="654" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">classification (98.6%/91.4% real-only). 1,000</text>
+<text x="1086" y="674" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#111827" text-anchor="start">real learner rows collected.</text>
+<text x="60" y="866" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#6B7280" text-anchor="start" font-style="italic">Gaps for prior work are as reported by their own authors; this row's figures are measured from the current build (see 05_model_architecture, 06_esp32_fit).</text>
+</svg>
