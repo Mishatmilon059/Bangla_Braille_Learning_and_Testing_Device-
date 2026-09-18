@@ -1,4 +1,4 @@
-﻿# Bangla Braille Learning and Testing Device: An AI-Assisted Embedded Haptic-Audio Pedagogical System
+﻿# AI Driven Bangla Braille Learning Device
 
 **Department of Electrical and Electronic Engineering (EEE)**  
 **Bangladesh University of Engineering and Technology (BUET)**  
