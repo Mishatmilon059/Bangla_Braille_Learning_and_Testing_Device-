@@ -375,7 +375,12 @@ static void run_test_item(int letter_id) {
     return;
   }
 
-  if (g_cur_test_index == 0) g_batch_count = 0;   // fresh batch starting
+  if (g_cur_test_index == 0) {
+    g_batch_count = 0;   // fresh batch starting
+    Serial.println("[test] Audio: 'পরীক্ষা শুরু হচ্ছে' (Track 61)");
+    play_and_wait(61, 4000);
+    delay(400);
+  }
 
   uint8_t expected = BRAILLE_PATTERN[letter_id];
   int     track     = letter_id + 1;
@@ -401,7 +406,28 @@ static void run_test_item(int letter_id) {
     g_batch_results[g_batch_count++] = { letter_id, correct, response_time };
   }
 
-  if (g_cur_test_index + 1 >= g_cur_test_total) print_test_summary();
+  if (g_cur_test_index + 1 >= g_cur_test_total) {
+    print_test_summary();
+
+    int correct_cnt = 0;
+    for (int i = 0; i < g_batch_count; i++) if (g_batch_results[i].correct) correct_cnt++;
+    int wrong_cnt = g_batch_count - correct_cnt;
+
+    delay(600);
+    play_and_wait(62, 3500); // "পরীক্ষা শেষ"
+    delay(300);
+    play_and_wait(51, 2000); // "সঠিক"
+    delay(200);
+    int c_num = (correct_cnt < 0) ? 0 : (correct_cnt > 10 ? 10 : correct_cnt);
+    play_and_wait(70 + c_num, 2000);
+    delay(300);
+    play_and_wait(52, 2000); // "ভুল"
+    delay(200);
+    int w_num = (wrong_cnt < 0) ? 0 : (wrong_cnt > 10 ? 10 : wrong_cnt);
+    play_and_wait(70 + w_num, 2000);
+    delay(400);
+    play_and_wait(63, 3500); // "ধন্যবাদ"
+  }
 }
 
 // ---------------------------------------------------------------------------

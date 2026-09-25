@@ -294,8 +294,15 @@ export function startTeacherApp() {
       item.addEventListener('click', () => {
         const id = +item.dataset.id;
         const letter = LETTERS[id];
-        if (S.testSelected.has(id)) S.testSelected.delete(id);
-        else S.testSelected.add(id);
+        if (S.testSelected.has(id)) {
+          S.testSelected.delete(id);
+        } else {
+          if (S.testSelected.size >= 10) {
+            showToast('পরীক্ষায় সর্বোচ্চ ১০টি বর্ণ নির্বাচন করা যাবে!');
+            return;
+          }
+          S.testSelected.add(id);
+        }
         item.classList.toggle('selected', S.testSelected.has(id));
         updateTestSelCount();
         if (S.testSelected.size > 0) {
@@ -311,9 +318,9 @@ export function startTeacherApp() {
 
   function updateTestSelCount() {
     const n = S.testSelected.size;
-    el('test-sel-count').textContent = `${n} টি বর্ণ নির্বাচিত`;
+    el('test-sel-count').textContent = `${n}/১০ টি বর্ণ নির্বাচিত`;
     const btn = el('btn-test-start');
-    if (n > 0) btn.classList.remove('disabled');
+    if (n > 0 && n <= 10) btn.classList.remove('disabled');
     else btn.classList.add('disabled');
   }
 
@@ -344,7 +351,7 @@ export function startTeacherApp() {
     S.testQIdx = 0;
     S.testResults = [];
     S.testStartTime = Date.now();
-    S.testQueue = [...S.testSelected].map((id) => LETTERS[id]).sort(() => Math.random() - 0.5);
+    S.testQueue = [...S.testSelected].map((id) => LETTERS[id]).sort(() => Math.random() - 0.5).slice(0, 10);
 
     showScreen('test-run');
     sendPlay(S.testQueue[0].id, true, 0, S.testQueue.length);

@@ -45,7 +45,13 @@
 
 // ---------------------------------------------------------------------------
 
-#define TRACK_CORRECT  51
+#define TRACK_CORRECT      51
+#define TRACK_WRONG        52
+#define TRACK_TEST_START   61
+#define TRACK_TEST_END     62
+#define TRACK_THANK_YOU    63
+#define TRACK_NUMBER_BASE  70
+
 #define DOT_ON_MS     500
 #define DOT_GAP_MS    500
 #define STAGE_GAP_MS  1200
@@ -60,6 +66,11 @@ static long     g_last_id     = -1;
 static uint32_t g_last_poll   = 0;
 static int      g_attempt_idx = 0;
 static char     g_session_id[24];
+static char     g_command[16]         = "play";
+static int      g_test_index          = 0;
+static int      g_test_total          = 1;
+static int      g_test_correct_count  = 0;
+static int      g_test_wrong_count    = 0;
 
 // The student currently named by the last-polled command, and the student
 // char_state[] currently reflects. They differ for exactly one loop() pass
@@ -407,7 +418,7 @@ static int poll_supabase() {
   String url = String(SUPABASE_URL) + "/rest/v1/remote_commands"
     + "?device_id=eq." + DEVICE_ID
     + "&id=gt."        + String(g_last_id)
-    + "&order=id.asc&limit=1&select=id,letter_id,student_id";
+    + "&order=id.asc&limit=1&select=id,letter_id,student_id,command,test_index,test_total";
   http.begin(https_client(), url);
   http.setReuse(true);
   http.addHeader("apikey",        SUPABASE_ANON_KEY);
@@ -437,6 +448,38 @@ static int poll_supabase() {
           }
         }
         // startsWith("null") -> no student on this row -> keep g_student_id as-is
+      }
+
+      int cmd_pos = body.indexOf("\"command\":");
+      if (cmd_pos >= 0) {
+        String after = body.substring(cmd_pos + 10);
+        if (after.startsWith("\"")) {
+          int end_q = after.indexOf('"', 1);
+          if (end_q > 0) {
+            String cmd = after.substring(1, end_q);
+            cmd.toCharArray(g_command, sizeof(g_command));
+          }
+        }
+      } else {
+        strcpy(g_command, "play");
+      }
+
+      int t_idx_pos = body.indexOf("\"test_index\":");
+      if (t_idx_pos >= 0) {
+        String after = body.substring(t_idx_pos + 13);
+        if (!after.startsWith("null")) g_test_index = after.toInt();
+        else g_test_index = 0;
+      } else {
+        g_test_index = 0;
+      }
+
+      int t_tot_pos = body.indexOf("\"test_total\":");
+      if (t_tot_pos >= 0) {
+        String after = body.substring(t_tot_pos + 13);
+        if (!after.startsWith("null")) g_test_total = after.toInt();
+        else g_test_total = 1;
+      } else {
+        g_test_total = 1;
       }
 
       g_last_id = id;
@@ -633,6 +676,153 @@ static void learning_round(int letter_id) {
 }
 
 // ---------------------------------------------------------------------------
+// Testing mode: NO vibration motors, audio prompt, single submit, and scoring
+// ---------------------------------------------------------------------------
+
+static void report_test_attempt(int letter_id, uint8_t expected, uint8_t entered,
+                                uint32_t rt_ms, bool correct) {
+  String body = "{";
+  body += "\"user_id\":\""     + String(g_student_id) + "\",";
+  body += "\"session_id\":\"" + String(g_session_id) + "\",";
+  body += "\"device_id\":\""  + String(DEVICE_ID)     + "\",";
+  body += "\"attempt_index\":" + String(g_attempt_idx) + ",";
+  body += "\"char_id\":"       + String(letter_id) + ",";
+  body += "\"response_time\":" + String(rt_ms) + ",";
+  body += "\"press_duration\":" + String(buttons_mean_press_duration(), 1) + ",";
+  body += "\"retry_count\":0,";
+  body += "\"prev_accuracy\":0,";
+  body += "\"prev_mastery\":0,";
+  body += "\"hint_count\":0,";
+  body += "\"session_number\":1,";
+  body += "\"difficulty_level\":1,";
+  body += "\"time_since_last_practice\":0,";
+  body += "\"prev_confidence\":0,";
+  body += "\"current_streak\":0,";
+  body += "\"wrong_streak\":0,";
+  body += "\"prev_mistakes\":0,";
+  body += "\"teaching_action\":"  + String(correct ? 2 : 0) + ",";
+  body += "\"confidence_state\":" + String(correct ? 0 : 1) + ",";
+  body += "\"expected_pattern\":" + String(expected) + ",";
+  body += "\"entered_pattern\":"  + String(entered) + ",";
+  body += "\"is_correct\":"       + String(correct ? "true" : "false") + ",";
+  body += "\"press_order\":\""    + press_order_json() + "\",";
+  body += "\"source\":\"esp32\",";
+  body += "\"is_synthetic\":false,";
+  body += "\"spec_version\":2,";
+  body += "\"braille_map_verified\":true";
+  body += "}";
+
+  HTTPClient http;
+  http.begin(https_client(), String(SUPABASE_URL) + "/rest/v1/attempts");
+  http.setReuse(true);
+  http.addHeader("apikey",        SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.addHeader("Content-Type",  "application/json");
+  http.addHeader("Prefer",        "return=minimal");
+
+  int code = http.POST(body);
+  Serial.printf("  [test-report] student=%s letter=%d -> HTTP %d\n", g_student_id, letter_id, code);
+  if (code < 200 || code >= 300) Serial.println(http.getString());
+  http.end();
+
+  g_attempt_idx++;
+}
+
+static void test_round(int letter_id, int test_index, int test_total) {
+  if (letter_id < 0 || letter_id >= BRAILLE_LETTER_COUNT) {
+    Serial.printf("[test] letter_id %d out of range\n", letter_id);
+    return;
+  }
+
+  // 1. CRITICAL: Vibration motors are ALWAYS OFF in test mode!
+  motors_all_off();
+
+  // 2. If first question of test: announce start
+  if (test_index == 0) {
+    g_test_correct_count = 0;
+    g_test_wrong_count   = 0;
+    Serial.println("\n[test] === NEW TEST STARTED ===");
+    Serial.println("[test] Audio: 'পরীক্ষা শুরু হচ্ছে' (Track 61)");
+    play_and_wait(TRACK_TEST_START, 4000);
+    delay(400);
+  }
+
+  uint8_t expected = BRAILLE_PATTERN[letter_id];
+  int track = letter_id + 1;
+
+  Serial.printf("\n=========================================\n");
+  Serial.printf("[test] Item %d/%d -- Letter #%d track=%d expected=0x%02X\n",
+                test_index + 1, test_total, letter_id, track, expected);
+  Serial.println("[test] (Vibration motors DISABLED)");
+  Serial.printf("=========================================\n");
+
+  // Play audio prompt for the letter
+  play_and_wait(track, 7000);
+
+  // Single attempt from student (no vibration, no hints)
+  uint32_t rt_ms = 0;
+  uint8_t entered = wait_for_submit(&rt_ms);
+  bool correct = (entered == expected);
+
+  if (correct) {
+    g_test_correct_count++;
+    Serial.printf("[test] CORRECT! (rt=%ums)\n", (unsigned)rt_ms);
+  } else {
+    g_test_wrong_count++;
+    Serial.printf("[test] WRONG! entered=0x%02X expected=0x%02X (rt=%ums)\n",
+                  entered, expected, (unsigned)rt_ms);
+  }
+
+  // Report attempt to Supabase
+  report_test_attempt(letter_id, expected, entered, rt_ms, correct);
+
+  // If last item of the test: announce summary
+  if (test_index + 1 >= test_total) {
+    Serial.println("\n=========================================");
+    Serial.printf("[test] TEST COMPLETE! Correct: %d, Wrong: %d\n",
+                  g_test_correct_count, g_test_wrong_count);
+    Serial.println("=========================================");
+
+    delay(600);
+    // 1. "পরীক্ষা শেষ"
+    Serial.println("[test] Audio: 'পরীক্ষা শেষ' (Track 62)");
+    play_and_wait(TRACK_TEST_END, 3500);
+    delay(300);
+
+    // 2. "সঠিক"
+    Serial.println("[test] Audio: 'সঠিক' (Track 51)");
+    play_and_wait(TRACK_CORRECT, 2000);
+    delay(200);
+
+    // 3. Spoken number for correct count (0..10)
+    int c_num = g_test_correct_count;
+    if (c_num < 0) c_num = 0;
+    if (c_num > 10) c_num = 10;
+    Serial.printf("[test] Audio: number %d (Track %d)\n", c_num, TRACK_NUMBER_BASE + c_num);
+    play_and_wait(TRACK_NUMBER_BASE + c_num, 2000);
+    delay(300);
+
+    // 4. "ভুল"
+    Serial.println("[test] Audio: 'ভুল' (Track 52)");
+    play_and_wait(TRACK_WRONG, 2000);
+    delay(200);
+
+    // 5. Spoken number for wrong count (0..10)
+    int w_num = g_test_wrong_count;
+    if (w_num < 0) w_num = 0;
+    if (w_num > 10) w_num = 10;
+    Serial.printf("[test] Audio: number %d (Track %d)\n", w_num, TRACK_NUMBER_BASE + w_num);
+    play_and_wait(TRACK_NUMBER_BASE + w_num, 2000);
+    delay(400);
+
+    // 6. "ধন্যবাদ"
+    Serial.println("[test] Audio: 'ধন্যবাদ' (Track 63)");
+    play_and_wait(TRACK_THANK_YOU, 3500);
+    Serial.println("[test] Audio cues complete.\n");
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 void setup() {
   Serial.begin(115200);
@@ -687,7 +877,11 @@ void loop() {
         load_student_state(g_student_id);
         strncpy(g_loaded_student_id, g_student_id, sizeof(g_loaded_student_id));
       }
-      learning_round(letter_id);
+      if (strcmp(g_command, "test") == 0) {
+        test_round(letter_id, g_test_index, g_test_total);
+      } else {
+        learning_round(letter_id);
+      }
     }
   }
 }
