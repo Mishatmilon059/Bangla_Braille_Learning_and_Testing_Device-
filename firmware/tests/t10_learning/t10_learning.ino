@@ -39,6 +39,7 @@ static long     g_last_id     = -1;
 static uint32_t g_last_poll   = 0;
 static int      g_attempt_idx = 0;
 static char     g_session_id[24];
+static char     g_command[16] = "";
 
 // A fresh WiFiClientSecure means a full TLS handshake (0.5-3s on ESP32) --
 // expensive enough that doing it on every 700ms poll makes the whole loop
@@ -120,7 +121,7 @@ static int poll_supabase() {
   String url = String(SUPABASE_URL) + "/rest/v1/remote_commands"
     + "?device_id=eq." + DEVICE_ID
     + "&id=gt."        + String(g_last_id)
-    + "&order=id.asc&limit=1&select=id,letter_id";
+    + "&order=id.asc&limit=1&select=id,letter_id,command";
 
   http.begin(https_client(), url);
   http.setReuse(true);
@@ -138,6 +139,19 @@ static int poll_supabase() {
       if (lid_pos >= 0) {
         String after = body.substring(lid_pos + 12);
         if (!after.startsWith("null")) letter_id = (int)after.toInt();
+      }
+      int cmd_pos = body.indexOf("\"command\":");
+      if (cmd_pos >= 0) {
+        String after = body.substring(cmd_pos + 10);
+        if (after.startsWith("\"")) {
+          int end_q = after.indexOf('"', 1);
+          if (end_q > 0) {
+            String cmd = after.substring(1, end_q);
+            cmd.toCharArray(g_command, sizeof(g_command));
+          }
+        }
+      } else {
+        strcpy(g_command, "play");
       }
       g_last_id = id;
     }
@@ -503,6 +517,15 @@ void loop() {
   if (millis() - g_last_poll >= POLL_MS) {
     g_last_poll = millis();
     int letter_id = poll_supabase();
-    if (letter_id >= 0) learning_round(letter_id);
+    if (strcmp(g_command, "stop") == 0) {
+      Serial.println("\n[cmd] STOP command received -- lesson ended.");
+      play_and_wait(62, 3500);  // Track 62: 'পরীক্ষা শেষ'
+      delay(300);
+      play_and_wait(63, 3500);  // Track 63: 'ধন্যবাদ'
+      strcpy(g_command, "");
+    } else if (letter_id >= 0) {
+      learning_round(letter_id);
+      strcpy(g_command, "");
+    }
   }
 }

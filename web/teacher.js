@@ -78,6 +78,7 @@ const S = {
   sessionStart:  null,
   lastAttemptId: null,
   pollTimer:     null,
+  stopRequested: false,
   studentId:  'S01',
   deviceId:   'esp32_01',
   weaknesses: {},
@@ -149,6 +150,15 @@ async function sendPlay(letterId, isTest = false, testIndex = null, testTotal = 
   await sbPost('remote_commands', body);
 }
 
+async function sendStop() {
+  await sbPost('remote_commands', {
+    device_id: S.deviceId,
+    letter_id: null,
+    command: 'stop',
+    created_at: new Date().toISOString(),
+  });
+}
+
 // ─── Attempt handler ──────────────────────────────────────────────────────────
 function handleAttempt(row) {
   if (S.screen === 'learn') {
@@ -159,8 +169,15 @@ function handleAttempt(row) {
 
     renderLearnResult(row, letter);
 
-    if (row.is_correct && S.learnMode === 'seq' && S.autoAdvance) {
-      setTimeout(seqNext, 1200);
+    if (row.is_correct) {
+      if (S.stopRequested) {
+        S.stopRequested = false;
+        showToast('✓ সঠিক উত্তর! পাঠদান শেষ হয়েছে। ধন্যবাদ।', 3500);
+        return;
+      }
+      if (S.learnMode === 'seq' && S.autoAdvance) {
+        setTimeout(seqNext, 1200);
+      }
     }
   } else if (S.screen === 'test-run') {
     const expected = S.testQueue[S.testQIdx];
@@ -613,9 +630,17 @@ export async function init() {
   // Sequential controls
   el('btn-seq-prev').addEventListener('click', seqPrev);
   el('btn-seq-next').addEventListener('click', seqNext);
-  el('btn-seq-teach').addEventListener('click', () => { sendPlay(LETTERS[S.seqIdx].id); showToast('পাঠদান শুরু হয়েছে'); });
+  el('btn-seq-teach').addEventListener('click', () => {
+    S.stopRequested = false;
+    sendPlay(LETTERS[S.seqIdx].id);
+    showToast('পাঠদান শুরু হয়েছে');
+  });
   el('btn-seq-play').addEventListener('click', () => { sendPlay(LETTERS[S.seqIdx].id); });
-  el('btn-seq-stop').addEventListener('click', () => { stopPoll(); showToast('পাঠদান থামানো হয়েছে'); });
+  el('btn-seq-stop').addEventListener('click', async () => {
+    S.stopRequested = true;
+    await sendStop();
+    showToast('পাঠদান থামানোর অনুরোধ পাঠানো হয়েছে। বর্তমান বর্ণটি সঠিক হলে শেষ হবে।');
+  });
   el('btn-seq-auto').addEventListener('click', () => {
     S.autoAdvance = !S.autoAdvance;
     el('btn-seq-auto').textContent = S.autoAdvance ? '⚡ অটো চালু' : '⚡ অটো';

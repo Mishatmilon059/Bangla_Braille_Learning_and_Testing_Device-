@@ -901,7 +901,13 @@ void loop() {
   if (millis() - g_last_poll >= POLL_MS) {
     g_last_poll = millis();
     int letter_id = poll_supabase();
-    if (letter_id >= 0) {
+    if (strcmp(g_command, "stop") == 0) {
+      Serial.println("\n[cmd] STOP command received -- lesson ended.");
+      play_and_wait(TRACK_TEST_END, 3500);  // Track 62: 'পরীক্ষা শেষ'
+      delay(300);
+      play_and_wait(TRACK_THANK_YOU, 3500); // Track 63: 'ধন্যবাদ'
+      strcpy(g_command, "");
+    } else if (letter_id >= 0) {
       if (strcmp(g_student_id, g_loaded_student_id) != 0) {
         load_student_state(g_student_id);
         strncpy(g_loaded_student_id, g_student_id, sizeof(g_loaded_student_id));
@@ -911,6 +917,7 @@ void loop() {
       } else {
         learning_round(letter_id);
       }
+      strcpy(g_command, "");
     }
   }
 }

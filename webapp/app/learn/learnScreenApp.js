@@ -36,6 +36,8 @@ export function startLearnScreenApp() {
     studentId: (typeof window !== 'undefined' && window.localStorage.getItem('teacher_student_id')) || 'S01',
     deviceId: 'esp32_01',
     weaknesses: {},
+    isTeaching: false,
+    stopRequested: false,
   };
 
   const cleanupFns = [];
@@ -138,6 +140,8 @@ export function startLearnScreenApp() {
   }
 
   async function sendPlay(letterId) {
+    S.isTeaching = true;
+    S.stopRequested = false;
     await sbPost('remote_commands', {
       device_id: S.deviceId,
       student_id: S.studentId,
@@ -145,6 +149,38 @@ export function startLearnScreenApp() {
       command: 'play',
       created_at: new Date().toISOString(),
     });
+  }
+
+  async function sendStop() {
+    await sbPost('remote_commands', {
+      device_id: S.deviceId,
+      student_id: S.studentId,
+      letter_id: null,
+      command: 'stop',
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  function playWebAudio(trackNum) {
+    try {
+      const audio = new Audio(`/audio/${String(trackNum).padStart(4, '0')}.mp3`);
+      return audio.play().catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  async function stopTeachSession() {
+    S.stopRequested = true;
+    await sendStop();
+    showToast('পাঠদান থামানোর নির্দেশ পাঠানো হয়েছে। বর্তমান বর্ণটি সঠিক হলে পাঠদান শেষ হবে।', 3500);
+
+    const matchEl = el(S.learnMode === 'seq' ? 'seq-match-badge' : 'rnd-match-badge');
+    if (matchEl) {
+      matchEl.textContent = '⏸️ বর্তমান বর্ণটির সঠিক উত্তর দিলে পাঠদান সমাপ্ত হবে';
+      matchEl.className = 'badge amber';
+      matchEl.classList.remove('hidden');
+    }
   }
 
   // ─── Student switching ──────────────────────────────────────────────────
@@ -171,9 +207,37 @@ export function startLearnScreenApp() {
 
     renderLearnResult(row, letter);
 
-    if (row.is_correct && S.learnMode === 'seq') {
-      showToast('✓ সঠিক উত্তর! পরবর্তী বর্ণে যাওয়া হচ্ছে...', 1800);
-      setTimeout(seqNext, 1500);
+    if (row.is_correct) {
+      if (S.stopRequested) {
+        // Teacher requested stop: finish this running word completely
+        S.stopRequested = false;
+        S.isTeaching = false;
+        showToast('✓ সঠিক উত্তর! পাঠদান শেষ হয়েছে। ধন্যবাদ।', 4000);
+
+        const matchEl = el(S.learnMode === 'seq' ? 'seq-match-badge' : 'rnd-match-badge');
+        if (matchEl) {
+          matchEl.textContent = '✓ পাঠদান সমাপ্ত ও ফলাফল সংরক্ষিত';
+          matchEl.className = 'badge green';
+          matchEl.classList.remove('hidden');
+        }
+
+        // Web audio fallback: Track 62 (পরীক্ষা শেষ) followed by Track 63 (ধন্যবাদ)
+        playWebAudio(62);
+        setTimeout(() => playWebAudio(63), 2000);
+
+        const teachBtn = el(S.learnMode === 'seq' ? 'btn-seq-teach' : 'btn-rnd-teach');
+        if (teachBtn) {
+          teachBtn.textContent = S.learnMode === 'seq' ? '▶ পাঠদান শুরু করুন' : '▶ শেখান';
+        }
+        return; // STOP HERE! Do not advance to next word
+      }
+
+      if (S.learnMode === 'seq' && S.autoAdvance) {
+        showToast('✓ সঠিক উত্তর! পরবর্তী বর্ণে যাওয়া হচ্ছে...', 1800);
+        setTimeout(seqNext, 1500);
+      } else {
+        showToast('✓ সঠিক উত্তর!');
+      }
     }
   }
 
@@ -391,7 +455,6 @@ export function startLearnScreenApp() {
       el('panel-seq').classList.remove('hidden');
       el('panel-rnd').classList.add('hidden');
       seqRender();
-      sendPlay(LETTERS[S.seqIdx].id);
     } else {
       el('panel-seq').classList.add('hidden');
       el('panel-rnd').classList.remove('hidden');
@@ -413,12 +476,14 @@ export function startLearnScreenApp() {
 
   on('btn-seq-prev', 'click', seqPrev);
   on('btn-seq-next', 'click', seqNext);
-  on('btn-seq-teach', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); showToast('পাঠদান শুরু হয়েছে'); });
+  on('btn-seq-teach', 'click', () => {
+    S.stopRequested = false;
+    sendPlay(LETTERS[S.seqIdx].id);
+    showToast('পাঠদান শুরু হয়েছে (ESP32 শুনছে...)');
+  });
   on('btn-seq-play', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); });
   on('btn-seq-stop', 'click', () => {
-    el('seq-result')?.classList.add('hidden');
-    el('seq-match-line')?.classList.add('hidden');
-    showToast('পাঠদান থামানো হয়েছে');
+    stopTeachSession();
   });
   on('btn-seq-auto', 'click', () => {
     S.autoAdvance = !S.autoAdvance;
@@ -432,6 +497,7 @@ export function startLearnScreenApp() {
       return;
     }
     const letter = LETTERS[S.rndSelected];
+    S.stopRequested = false;
     sendPlay(S.rndSelected);
     const teachBtn = el('btn-rnd-teach');
     if (teachBtn) teachBtn.textContent = '🔊 আবার শোনান';
@@ -439,11 +505,7 @@ export function startLearnScreenApp() {
   });
 
   on('btn-rnd-stop', 'click', () => {
-    const teachBtn = el('btn-rnd-teach');
-    if (teachBtn) teachBtn.textContent = '▶ শেখান';
-    el('rnd-result')?.classList.add('hidden');
-    el('rnd-match-badge')?.classList.add('hidden');
-    showToast('পাঠদান থামানো হয়েছে');
+    stopTeachSession();
   });
 
   on('btn-rnd-play', 'click', () => {
