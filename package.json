@@ -1,10 +1,12 @@
-﻿{
+{
   "name": "bangla-braille-learning-and-testing-device",
   "version": "1.0.0",
   "description": "AI-Assisted Bangla Braille Learning and Testing System with Offline ESP32 TinyML Inference and Haptic-Audio Feedback",
   "main": "index.html",
   "scripts": {
-    "dev": "python -m http.server 8000",
+    "dev": "npm --prefix webapp run dev",
+    "build": "npm --prefix webapp run build",
+    "start": "npm --prefix webapp run start",
     "test": "python tools/run_all_tests.py"
   },
   "repository": {

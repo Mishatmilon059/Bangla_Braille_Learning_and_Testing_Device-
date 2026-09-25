@@ -422,7 +422,8 @@ export function startTeacherApp() {
 
   function handleBack() {
     if (S.screen === 'test-select') {
-      window.location.href = '/';
+      const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      window.location.href = base ? `${base}/` : '/';
     } else if (S.screen === 'test-run') {
       if (confirm('পরীক্ষা বাতিল করবেন?')) showScreen('test-select');
     } else if (S.screen === 'results') {

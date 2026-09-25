@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/((?!web(?:/|$)).*)", "destination": "/web/$1" }
-  ]
-}

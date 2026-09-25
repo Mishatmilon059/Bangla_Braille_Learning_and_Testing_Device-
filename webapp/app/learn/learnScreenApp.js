@@ -352,7 +352,8 @@ export function startLearnScreenApp() {
   }
 
   function handleBack() {
-    window.location.href = '/';
+    const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    window.location.href = base ? `${base}/` : '/';
   }
 
   // ─── Init ───────────────────────────────────────────────────────────────
