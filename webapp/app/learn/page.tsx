@@ -108,7 +108,11 @@ export default function LearnScreenPage() {
               <div className="center" id="rnd-dots"></div>
               <div className="badge-row">
                 <div className="badge green hidden" id="rnd-match-badge">✓ সঠিক ইনপুট (ESP32)</div>
-                <button className="badge amber" id="btn-rnd-play" type="button">🔊 আবার শোনান</button>
+                <button className="badge amber hidden" id="btn-rnd-play" type="button">🔊 আবার শোনান</button>
+              </div>
+              <div className="btn-row" style={{ marginTop: 14 }}>
+                <button className="btn primary" id="btn-rnd-teach" type="button">▶ শেখান</button>
+                <button className="btn danger" id="btn-rnd-stop" type="button">✕ থামান</button>
               </div>
             </div>
 

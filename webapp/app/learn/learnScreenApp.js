@@ -290,8 +290,9 @@ export function startLearnScreenApp() {
         el('rnd-result').classList.add('hidden');
         const matchEl = el('rnd-match-badge');
         if (matchEl) matchEl.classList.add('hidden');
-        sendPlay(id);
-        showToast(`'${letter.char}' পাঠদান শুরু হয়েছে (ESP32 শুনছে...)`);
+        const teachBtn = el('btn-rnd-teach');
+        if (teachBtn) teachBtn.textContent = '▶ শেখান';
+        showToast(`'${letter.char}' নির্বাচিত হয়েছে। শেখাতে 'শেখান' চাপুন।`);
       });
     });
   }
@@ -414,11 +415,35 @@ export function startLearnScreenApp() {
   on('btn-seq-next', 'click', seqNext);
   on('btn-seq-teach', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); showToast('পাঠদান শুরু হয়েছে'); });
   on('btn-seq-play', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); });
-  on('btn-seq-stop', 'click', () => { stopPoll(); showToast('পাঠদান থামানো হয়েছে'); });
+  on('btn-seq-stop', 'click', () => {
+    el('seq-result')?.classList.add('hidden');
+    el('seq-match-line')?.classList.add('hidden');
+    showToast('পাঠদান থামানো হয়েছে');
+  });
   on('btn-seq-auto', 'click', () => {
     S.autoAdvance = !S.autoAdvance;
     el('btn-seq-auto').textContent = S.autoAdvance ? '⚡ অটো চালু' : '⚡ অটো';
     el('btn-seq-auto').className = S.autoAdvance ? 'btn primary' : 'btn outline';
+  });
+
+  on('btn-rnd-teach', 'click', () => {
+    if (S.rndSelected === null) {
+      showToast('আগে নিচের তালিকা থেকে একটি বর্ণ নির্বাচন করুন');
+      return;
+    }
+    const letter = LETTERS[S.rndSelected];
+    sendPlay(S.rndSelected);
+    const teachBtn = el('btn-rnd-teach');
+    if (teachBtn) teachBtn.textContent = '🔊 আবার শোনান';
+    showToast(`'${letter.char}' পাঠদান শুরু হয়েছে (ESP32 শুনছে...)`);
+  });
+
+  on('btn-rnd-stop', 'click', () => {
+    const teachBtn = el('btn-rnd-teach');
+    if (teachBtn) teachBtn.textContent = '▶ শেখান';
+    el('rnd-result')?.classList.add('hidden');
+    el('rnd-match-badge')?.classList.add('hidden');
+    showToast('পাঠদান থামানো হয়েছে');
   });
 
   on('btn-rnd-play', 'click', () => {
