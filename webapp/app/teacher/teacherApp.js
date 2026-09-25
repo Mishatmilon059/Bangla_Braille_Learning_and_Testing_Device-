@@ -94,11 +94,11 @@ export function startTeacherApp() {
   }
 
   async function checkRecentActivity() {
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const rows = await sbGet('attempts', {
-      select: 'id,created_at',
+      select: 'id,created_at,user_id',
       device_id: `eq.${S.deviceId}`,
-      created_at: `gt.${thirtyMinsAgo}`,
+      created_at: `gt.${fourHoursAgo}`,
       limit: '1',
     });
     if (rows.length) {
@@ -111,7 +111,7 @@ export function startTeacherApp() {
   async function pollAttempts() {
     const rows = await sbGet('attempts', {
       select: 'id,char_id,is_correct,teaching_action,confidence_state,response_time,entered_pattern,expected_pattern,created_at',
-      user_id: `eq.${S.studentId}`,
+      device_id: `eq.${S.deviceId}`,
       created_at: `gt.${S.sessionStart}`,
       order: 'created_at.desc',
       limit: '1',

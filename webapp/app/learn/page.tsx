@@ -95,18 +95,26 @@ export default function LearnScreenPage() {
 
           {/* Random panel */}
           <div id="panel-rnd" className="hidden">
-            <div className="sel-card hidden" id="rnd-sel-card">
-              <div className="sel-char" id="rnd-char">ক</div>
-              <div className="sel-info">
-                <div className="sel-info-lbl">নির্বাচিত বর্ণ</div>
-                <div className="sel-info-name" id="rnd-name">ব্যঞ্জনবর্ণ</div>
+            <div className="card hidden" id="rnd-sel-card">
+              <div className="card-lbl-row">
+                <span className="card-lbl">নির্বাচিত বর্ণ</span>
+                <span className="text-xs" id="rnd-label">এলোমেলো মোড</span>
               </div>
-              <button className="badge amber" id="btn-rnd-play" type="button">🔊</button>
+              <div className="char-display">
+                <div className="char-bn" id="rnd-char">ক</div>
+                <div className="char-sub" id="rnd-name">ব্যঞ্জনবর্ণ</div>
+                <div className="text-xs hidden" id="rnd-prefix" style={{ color: "var(--amber)", marginTop: 4 }}></div>
+              </div>
+              <div className="center" id="rnd-dots"></div>
+              <div className="badge-row">
+                <div className="badge green hidden" id="rnd-match-badge">✓ সঠিক ইনপুট (ESP32)</div>
+                <button className="badge amber" id="btn-rnd-play" type="button">🔊 আবার শোনান</button>
+              </div>
             </div>
 
             <div className="result-panel hidden" id="rnd-result">
               <div className="result-top">
-                <span className="action-badge wait" id="rnd-action">অপেক্ষায়...</span>
+                <span className="action-badge wait" id="rnd-action">—</span>
                 <span className="conf-text" id="rnd-conf"></span>
               </div>
               <div className="hint-line hidden" id="rnd-hint"></div>

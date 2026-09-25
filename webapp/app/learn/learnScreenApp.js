@@ -84,11 +84,11 @@ export function startLearnScreenApp() {
   }
 
   async function checkRecentActivity() {
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const rows = await sbGet('attempts', {
-      select: 'id,created_at',
+      select: 'id,created_at,user_id',
       device_id: `eq.${S.deviceId}`,
-      created_at: `gt.${thirtyMinsAgo}`,
+      created_at: `gt.${fourHoursAgo}`,
       limit: '1',
     });
     if (rows.length) {
@@ -101,7 +101,7 @@ export function startLearnScreenApp() {
   async function pollAttempts() {
     const rows = await sbGet('attempts', {
       select: 'id,char_id,is_correct,teaching_action,confidence_state,response_time,entered_pattern,expected_pattern,created_at',
-      user_id: `eq.${S.studentId}`,
+      device_id: `eq.${S.deviceId}`,
       created_at: `gt.${S.sessionStart}`,
       order: 'created_at.desc',
       limit: '1',
@@ -147,8 +147,9 @@ export function startLearnScreenApp() {
 
     renderLearnResult(row, letter);
 
-    if (row.is_correct && S.learnMode === 'seq' && S.autoAdvance) {
-      setTimeout(seqNext, 1200);
+    if (row.is_correct && S.learnMode === 'seq') {
+      showToast('✓ সঠিক উত্তর! পরবর্তী বর্ণে যাওয়া হচ্ছে...', 1800);
+      setTimeout(seqNext, 1500);
     }
   }
 
@@ -252,9 +253,20 @@ export function startLearnScreenApp() {
           i.classList.toggle('selected', +i.dataset.id === id));
         el('rnd-char').textContent = letter.char;
         el('rnd-name').textContent = letter.name;
+        el('rnd-label').textContent = `নির্বাচিত বর্ণ #${id + 1}`;
+        el('rnd-dots').innerHTML = brailleCellHtml(letter.mask);
+        if (letter.prefix) {
+          el('rnd-prefix').textContent = `দুই-কোষ: প্রথমে ডট ${letter.prefix.join(',')} স্পন্দিত হবে`;
+          el('rnd-prefix').classList.remove('hidden');
+        } else {
+          el('rnd-prefix').classList.add('hidden');
+        }
         el('rnd-sel-card').classList.remove('hidden');
         el('rnd-result').classList.add('hidden');
+        const matchEl = el('rnd-match-badge');
+        if (matchEl) matchEl.classList.add('hidden');
         sendPlay(id);
+        showToast(`'${letter.char}' পাঠদান শুরু হয়েছে (ESP32 শুনছে...)`);
       });
     });
   }
@@ -315,31 +327,28 @@ export function startLearnScreenApp() {
 
     el(prefix + '-conf').textContent = CONFIDENCE[cs];
 
-    if (isSeq) {
-      const hintEl = el('seq-hint');
-      hintEl.textContent = ok ? '✓ সঠিক উত্তর' : generateHint(inp, ep);
-      hintEl.classList.remove('hidden');
-      hintEl.style.color = ok ? 'var(--green-dark)' : 'var(--amber)';
+    const hintEl = el(prefix + '-hint');
+    hintEl.textContent = ok ? '✓ সঠিক উত্তর' : generateHint(inp, ep);
+    hintEl.classList.remove('hidden');
+    hintEl.style.color = ok ? 'var(--green-dark)' : 'var(--amber)';
 
-      const matchEl = el('seq-match-badge');
-      if (ok) matchEl.classList.remove('hidden');
-      else matchEl.classList.add('hidden');
-
-      const cmpEl = el('seq-dots-cmp');
-      cmpEl.classList.remove('hidden');
-      el('seq-dots-ent').innerHTML = brailleCellHtml(inp, ep);
-      el('seq-dots-exp').innerHTML = brailleCellHtml(ep);
-    } else {
-      const hintEl = el('rnd-hint');
-      hintEl.textContent = ok ? '✓ সঠিক উত্তর' : generateHint(inp, ep);
-      hintEl.classList.remove('hidden');
-      hintEl.style.color = ok ? 'var(--green-dark)' : 'var(--amber)';
-
-      const cmpEl = el('rnd-dots-cmp');
-      cmpEl.classList.remove('hidden');
-      el('rnd-dots-ent').innerHTML = brailleCellHtml(inp, ep);
-      el('rnd-dots-exp').innerHTML = brailleCellHtml(ep);
+    const matchEl = el(prefix + '-match-badge');
+    if (matchEl) {
+      if (ok) {
+        matchEl.textContent = '✓ সঠিক উত্তর (ESP32)';
+        matchEl.className = 'badge green';
+        matchEl.classList.remove('hidden');
+      } else {
+        matchEl.textContent = '✕ ভুল উত্তর (আবার চেষ্টা করুন)';
+        matchEl.className = 'badge amber';
+        matchEl.classList.remove('hidden');
+      }
     }
+
+    const cmpEl = el(prefix + '-dots-cmp');
+    cmpEl.classList.remove('hidden');
+    el(prefix + '-dots-ent').innerHTML = brailleCellHtml(inp, ep);
+    el(prefix + '-dots-exp').innerHTML = brailleCellHtml(ep);
   }
 
   // ─── Random mode ────────────────────────────────────────────────────────
