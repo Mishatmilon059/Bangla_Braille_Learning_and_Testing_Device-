@@ -1,16 +1,20 @@
-// Teacher panel logic — ported from web/teacher.js.
+// Teacher panel logic — exam/test flow only.
+//
+// This used to also contain the "শেখানো" (teaching) screen, but that runs a
+// different feature (a live teaching session) from a different menu
+// ("পরীক্ষা" tests a student on letters they've already been taught) and was
+// moved to webapp/app/learn/learnScreenApp.js so each nav item does exactly
+// one thing. This file keeps only the test-select -> test-run -> results
+// flow.
 //
 // Same low-risk strategy as learnApp.js: reuse the exact tested
 // getElementById-driven state machine rather than re-deriving it as
 // idiomatic React state, wired up via a useEffect in page.tsx against
 // JSX-rendered elements with matching ids.
-//
-// One real fix over the original: LETTERS now comes from lib/brailleMap.js
-// (generated from data/braille_map.json) instead of teacher.js's own
-// hand-duplicated array, so the two can never drift apart.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/config';
 import { LETTERS as RAW_LETTERS } from '@/lib/brailleMap';
+import { updateMastery } from '@/lib/ruleEngine';
 
 const LETTERS = RAW_LETTERS.map((l) => ({
   ...l,
@@ -18,19 +22,11 @@ const LETTERS = RAW_LETTERS.map((l) => ({
   prefix: l.cells ? l.cells[0] : undefined,
 }));
 
-const TEACHING   = ['আবার চেষ্টা করো', 'হিন্ট দেখুন', 'সঠিক — এগিয়ে যান'];
-const CONFIDENCE = ['আত্মবিশ্বাসী', 'দ্বিধাগ্রস্ত', 'অনুমান করছে'];
-
 export function startTeacherApp() {
   const el = (id) => document.getElementById(id);
 
   const S = {
-    screen: 'learn',
-    learnMode: 'seq',
-    seqIdx: 0,
-    autoAdvance: false,
-    rndSelected: null,
-    rndFilter: 'all',
+    screen: 'test-select',
     testFilter: 'all',
     testSelected: new Set(),
     testQueue: [],
@@ -40,7 +36,7 @@ export function startTeacherApp() {
     sessionStart: null,
     lastAttemptId: null,
     pollTimer: null,
-    studentId: 'S01',
+    studentId: (typeof window !== 'undefined' && window.localStorage.getItem('teacher_student_id')) || 'S01',
     deviceId: 'esp32_01',
     weaknesses: {},
     resTab: 'correct',
@@ -85,13 +81,15 @@ export function startTeacherApp() {
   }
 
   // ─── Polling ────────────────────────────────────────────────────────────
+  // Same honesty fix as learnScreenApp.js: starting a DB poll proves nothing
+  // about a real ESP32 being present, so the badge starts as "খুঁজছে..." and
+  // only flips to connected once a genuinely new attempt row actually arrives.
   function startPoll() {
     S.sessionStart = new Date().toISOString();
     S.lastAttemptId = null;
     clearInterval(S.pollTimer);
     S.pollTimer = setInterval(pollAttempts, 200);
     cleanupFns.push(() => clearInterval(S.pollTimer));
-    setEspStatus('connected');
   }
 
   function stopPoll() { clearInterval(S.pollTimer); setEspStatus('idle'); }
@@ -99,12 +97,14 @@ export function startTeacherApp() {
   async function pollAttempts() {
     const rows = await sbGet('attempts', {
       select: 'id,char_id,is_correct,teaching_action,confidence_state,response_time,entered_pattern,expected_pattern,created_at',
+      user_id: `eq.${S.studentId}`,
       created_at: `gt.${S.sessionStart}`,
       order: 'created_at.desc',
       limit: '1',
     });
     if (rows.length && rows[0].id !== S.lastAttemptId) {
       S.lastAttemptId = rows[0].id;
+      setEspStatus('connected');
       handleAttempt(rows[0]);
     }
   }
@@ -112,6 +112,7 @@ export function startTeacherApp() {
   async function sendPlay(letterId, isTest = false, testIndex = null, testTotal = null) {
     const body = {
       device_id: S.deviceId,
+      student_id: S.studentId,
       letter_id: letterId,
       command: isTest ? 'test' : 'play',
       created_at: new Date().toISOString(),
@@ -120,38 +121,41 @@ export function startTeacherApp() {
     await sbPost('remote_commands', body);
   }
 
+  // ─── Student switching ──────────────────────────────────────────────────
+  function setStudentId(id) {
+    const clean = (id || '').trim();
+    if (!clean || clean === S.studentId) return;
+    S.studentId = clean;
+    try { window.localStorage.setItem('teacher_student_id', clean); } catch {}
+    updateStudentBadge();
+    loadWeaknesses();
+  }
+
+  function updateStudentBadge() {
+    const badge = el('student-id-label');
+    if (badge) badge.textContent = S.studentId;
+  }
+
   // ─── Attempt handler ────────────────────────────────────────────────────
   function handleAttempt(row) {
-    if (S.screen === 'learn') {
-      const letter = S.learnMode === 'seq'
-        ? LETTERS[S.seqIdx]
-        : (S.rndSelected !== null ? LETTERS[S.rndSelected] : null);
-      if (!letter || row.char_id !== letter.id) return;
+    if (S.screen !== 'test-run') return;
+    const expected = S.testQueue[S.testQIdx];
+    if (!expected || row.char_id !== expected.id) return;
 
-      renderLearnResult(row, letter);
+    S.testResults.push({
+      letter: expected,
+      is_correct: row.is_correct,
+      response_time: row.response_time ?? 0,
+      entered_pattern: row.entered_pattern ?? 0,
+      expected_pattern: row.expected_pattern ?? expected.mask,
+    });
 
-      if (row.is_correct && S.learnMode === 'seq' && S.autoAdvance) {
-        setTimeout(seqNext, 1200);
-      }
-    } else if (S.screen === 'test-run') {
-      const expected = S.testQueue[S.testQIdx];
-      if (!expected || row.char_id !== expected.id) return;
-
-      S.testResults.push({
-        letter: expected,
-        is_correct: row.is_correct,
-        response_time: row.response_time ?? 0,
-        entered_pattern: row.entered_pattern ?? 0,
-        expected_pattern: row.expected_pattern ?? expected.mask,
-      });
-
-      if (S.testQIdx + 1 >= S.testQueue.length) {
-        setTimeout(testShowResults, 800);
-      } else {
-        S.testQIdx++;
-        sendPlay(S.testQueue[S.testQIdx].id, true, S.testQIdx, S.testQueue.length);
-        renderTestQuestion();
-      }
+    if (S.testQIdx + 1 >= S.testQueue.length) {
+      setTimeout(testShowResults, 800);
+    } else {
+      S.testQIdx++;
+      sendPlay(S.testQueue[S.testQIdx].id, true, S.testQIdx, S.testQueue.length);
+      renderTestQuestion();
     }
   }
 
@@ -182,17 +186,11 @@ export function startTeacherApp() {
     if (target) target.classList.add('active');
 
     const titles = {
-      learn: 'সহজ পাঠ',
       'test-select': 'বর্ণ নির্বাচন',
       'test-run': 'পরীক্ষা চলছে',
       results: 'ফলাফল ও মূল্যায়ন',
     };
-    el('hdr-title').textContent = titles[name] || 'শিক্ষক প্যানেল';
-
-    const navMap = { learn: 'nav-learn', 'test-select': 'nav-test', 'test-run': 'nav-test', results: 'nav-test' };
-    document.querySelectorAll('.teacher-app .nav-btn').forEach((b) => b.classList.remove('active'));
-    const activeNav = el(navMap[name]);
-    if (activeNav) activeNav.classList.add('active');
+    el('hdr-title').textContent = titles[name] || 'পরীক্ষা';
   }
 
   function brailleCellHtml(dotMask, expectedMask = -1) {
@@ -209,19 +207,6 @@ export function startTeacherApp() {
       } else if (on) cls += ' on';
       return `<span class="${cls}" title="ডট ${d}"></span>`;
     }).join('')}</div>`;
-  }
-
-  function generateHint(entered, expected) {
-    const missing = [], extra = [];
-    for (let d = 0; d < 6; d++) {
-      const bit = 1 << d;
-      if ((expected & bit) && !(entered & bit)) missing.push(d + 1);
-      if (!(expected & bit) && (entered & bit)) extra.push(d + 1);
-    }
-    const parts = [];
-    if (missing.length) parts.push(`বাদ পড়েছে → ডট ${missing.join(', ')}`);
-    if (extra.length) parts.push(`অতিরিক্ত → ডট ${extra.join(', ')}`);
-    return parts.join('  |  ') || 'আবার চেষ্টা করো';
   }
 
   function classifyError(row) {
@@ -251,14 +236,13 @@ export function startTeacherApp() {
     return 'poor';
   }
 
-  // ─── Letter grid renderer ───────────────────────────────────────────────
-  function renderLetterGrid(containerId, filter = 'all', isTest = false, onClickOverride = null) {
+  // ─── Letter grid renderer (test-select only, in this file) ─────────────
+  function renderLetterGrid(containerId, filter = 'all') {
     const container = el(containerId);
     const letters = filter === 'all' ? LETTERS : LETTERS.filter((l) => l.category === filter);
-    const selected = isTest ? S.testSelected : new Set();
 
     container.innerHTML = letters.map((l) => {
-      const sel = selected.has(l.id) ? 'selected' : '';
+      const sel = S.testSelected.has(l.id) ? 'selected' : '';
       const mCls = getMasteryClass(l.id);
       return `<div class="lg-item ${sel}" data-id="${l.id}">
         <div class="mastery-dot ${mCls}"></div>
@@ -270,29 +254,16 @@ export function startTeacherApp() {
       item.addEventListener('click', () => {
         const id = +item.dataset.id;
         const letter = LETTERS[id];
-        if (onClickOverride) { onClickOverride(letter, item); return; }
-
-        if (isTest) {
-          if (S.testSelected.has(id)) S.testSelected.delete(id);
-          else S.testSelected.add(id);
-          item.classList.toggle('selected', S.testSelected.has(id));
-          updateTestSelCount();
-          if (S.testSelected.size > 0) {
-            el('test-sel-char').textContent = letter.char;
-            el('test-sel-name').textContent = letter.name;
-            el('test-sel-preview').classList.remove('hidden');
-          } else {
-            el('test-sel-preview').classList.add('hidden');
-          }
+        if (S.testSelected.has(id)) S.testSelected.delete(id);
+        else S.testSelected.add(id);
+        item.classList.toggle('selected', S.testSelected.has(id));
+        updateTestSelCount();
+        if (S.testSelected.size > 0) {
+          el('test-sel-char').textContent = letter.char;
+          el('test-sel-name').textContent = letter.name;
+          el('test-sel-preview').classList.remove('hidden');
         } else {
-          S.rndSelected = id;
-          container.querySelectorAll('.lg-item').forEach((i) =>
-            i.classList.toggle('selected', +i.dataset.id === id));
-          el('rnd-char').textContent = letter.char;
-          el('rnd-name').textContent = letter.name;
-          el('rnd-sel-card').classList.remove('hidden');
-          el('rnd-result').classList.add('hidden');
-          sendPlay(id);
+          el('test-sel-preview').classList.add('hidden');
         }
       });
     });
@@ -316,94 +287,6 @@ export function startTeacherApp() {
     });
   }
 
-  // ─── Sequential mode ────────────────────────────────────────────────────
-  function seqRender() {
-    const letter = LETTERS[S.seqIdx];
-    el('seq-char').textContent = letter.char;
-    el('seq-name').textContent = letter.name;
-    el('seq-label').textContent = `বর্ণমালা নম্বর ${S.seqIdx + 1}`;
-    const pct = Math.round(((S.seqIdx + 1) / LETTERS.length) * 100);
-    el('seq-progress').textContent = `অগ্রগতি: ${S.seqIdx + 1}/${LETTERS.length}`;
-    el('seq-pct').textContent = `${pct}%`;
-    el('seq-bar').style.width = `${pct}%`;
-    el('seq-dots').innerHTML = brailleCellHtml(letter.mask);
-
-    if (letter.prefix) {
-      el('seq-prefix').textContent = `দুই-কোষ: প্রথমে ডট ${letter.prefix.join(',')} স্পন্দিত হবে`;
-      el('seq-prefix').classList.remove('hidden');
-    } else {
-      el('seq-prefix').classList.add('hidden');
-    }
-
-    el('seq-result').classList.add('hidden');
-    el('seq-match-badge').classList.add('hidden');
-    el('hdr-sub').textContent = `ছাত্র: ${S.studentId} • ক্রমানুসারে • বর্ণ ${S.seqIdx + 1}/${LETTERS.length}`;
-  }
-
-  function seqNext() {
-    if (S.seqIdx < LETTERS.length - 1) {
-      S.seqIdx++;
-      seqRender();
-      sendPlay(LETTERS[S.seqIdx].id);
-    } else {
-      showToast('সব বর্ণ শেষ হয়েছে!');
-    }
-  }
-
-  function seqPrev() {
-    if (S.seqIdx > 0) { S.seqIdx--; seqRender(); }
-  }
-
-  function renderLearnResult(row, letter) {
-    const ta = row.teaching_action ?? 2;
-    const cs = row.confidence_state ?? 1;
-    const ok = row.is_correct;
-    const ep = row.expected_pattern ?? letter.mask;
-    const inp = row.entered_pattern ?? 0;
-
-    const isSeq = S.learnMode === 'seq';
-    const prefix = isSeq ? 'seq' : 'rnd';
-    const resultEl = el(prefix + '-result');
-    resultEl.classList.remove('hidden');
-
-    const actionEl = el(prefix + '-action');
-    actionEl.textContent = TEACHING[ta];
-    actionEl.className = 'action-badge ' + ['repeat', 'hint', 'correct'][ta];
-
-    el(prefix + '-conf').textContent = CONFIDENCE[cs];
-
-    if (isSeq) {
-      const hintEl = el('seq-hint');
-      hintEl.textContent = ok ? '✓ সঠিক উত্তর' : generateHint(inp, ep);
-      hintEl.classList.remove('hidden');
-      hintEl.style.color = ok ? 'var(--green-dark)' : 'var(--amber)';
-
-      const matchEl = el('seq-match-badge');
-      if (ok) matchEl.classList.remove('hidden');
-      else matchEl.classList.add('hidden');
-
-      const cmpEl = el('seq-dots-cmp');
-      cmpEl.classList.remove('hidden');
-      el('seq-dots-ent').innerHTML = brailleCellHtml(inp, ep);
-      el('seq-dots-exp').innerHTML = brailleCellHtml(ep);
-    } else {
-      const hintEl = el('rnd-hint');
-      hintEl.textContent = ok ? '✓ সঠিক উত্তর' : generateHint(inp, ep);
-      hintEl.classList.remove('hidden');
-      hintEl.style.color = ok ? 'var(--green-dark)' : 'var(--amber)';
-
-      const cmpEl = el('rnd-dots-cmp');
-      cmpEl.classList.remove('hidden');
-      el('rnd-dots-ent').innerHTML = brailleCellHtml(inp, ep);
-      el('rnd-dots-exp').innerHTML = brailleCellHtml(ep);
-    }
-  }
-
-  // ─── Random mode ────────────────────────────────────────────────────────
-  function rndInit() {
-    renderLetterGrid('rnd-grid', S.rndFilter, false);
-  }
-
   // ─── Test mode ──────────────────────────────────────────────────────────
   function testInit() {
     S.testSelected = new Set();
@@ -412,7 +295,7 @@ export function startTeacherApp() {
     el('test-sel-preview').classList.add('hidden');
     el('btn-test-start').classList.add('disabled');
     el('test-sel-count').textContent = '০ টি বর্ণ নির্বাচিত';
-    renderLetterGrid('test-sel-grid', S.testFilter, true);
+    renderLetterGrid('test-sel-grid', S.testFilter);
     showScreen('test-select');
   }
 
@@ -500,11 +383,24 @@ export function startTeacherApp() {
       correct: S.testResults.filter((r) => r.is_correct).length,
       wrong: S.testResults.filter((r) => !r.is_correct).length,
     });
+    // Accumulate onto whatever this student's row already holds -- the same
+    // (student_id, char_id) row is also written by the ESP32's personalization
+    // path (see firmware/t12_ml_complete's save_student_weakness()), so
+    // overwriting wrong_count/correct_count with a flat 0/1 here would erase
+    // that history every time a test runs. mastery/streaks are updated with
+    // the exact same EMA formula the firmware and web/rule_engine.js use, so
+    // a test result affects "mastery" the same way a learning attempt does.
     for (const r of S.testResults) {
+      const prev = S.weaknesses[r.letter.id] || {
+        correct_count: 0, wrong_count: 0, mastery: 0, current_streak: 0, wrong_streak: 0,
+      };
       await sbUpsert('student_weaknesses', {
         student_id: S.studentId, char_id: r.letter.id,
-        wrong_count: r.is_correct ? 0 : 1,
-        correct_count: r.is_correct ? 1 : 0,
+        correct_count: (prev.correct_count || 0) + (r.is_correct ? 1 : 0),
+        wrong_count: (prev.wrong_count || 0) + (r.is_correct ? 0 : 1),
+        mastery: updateMastery(prev.mastery || 0, r.is_correct ? 1 : 0),
+        current_streak: r.is_correct ? (prev.current_streak || 0) + 1 : 0,
+        wrong_streak: r.is_correct ? 0 : (prev.wrong_streak || 0) + 1,
         last_tested: new Date().toISOString(),
       }, 'student_id,char_id');
     }
@@ -524,67 +420,22 @@ export function startTeacherApp() {
     }
   }
 
-  // ─── Mode switching ─────────────────────────────────────────────────────
-  function setLearnMode(lm) {
-    S.learnMode = lm;
-    el('tp-seq').classList.toggle('active', lm === 'seq');
-    el('tp-rnd').classList.toggle('active', lm === 'rnd');
-    if (lm === 'seq') {
-      el('panel-seq').classList.remove('hidden');
-      el('panel-rnd').classList.add('hidden');
-      seqRender();
-      sendPlay(LETTERS[S.seqIdx].id);
-    } else {
-      el('panel-seq').classList.add('hidden');
-      el('panel-rnd').classList.remove('hidden');
-      rndInit();
-      el('hdr-sub').textContent = `ছাত্র: ${S.studentId} • এলোমেলো মোড`;
-    }
-  }
-
   function handleBack() {
-    if (S.screen === 'test-select' || S.screen === 'results') {
-      showScreen('learn');
+    if (S.screen === 'test-select') {
+      window.location.href = '/';
     } else if (S.screen === 'test-run') {
       if (confirm('পরীক্ষা বাতিল করবেন?')) showScreen('test-select');
-    } else if (S.screen === 'learn') {
-      window.location.href = '/';
+    } else if (S.screen === 'results') {
+      testInit();
     }
   }
 
   // ─── Init ───────────────────────────────────────────────────────────────
-  el('hdr-sub').textContent = `ছাত্র: ${S.studentId} • বর্ণমালা শিক্ষা`;
-
-  loadWeaknesses();
-
   on('btn-back', 'click', handleBack);
-
-  on('tp-seq', 'click', () => setLearnMode('seq'));
-  on('tp-rnd', 'click', () => setLearnMode('rnd'));
-
-  on('btn-seq-prev', 'click', seqPrev);
-  on('btn-seq-next', 'click', seqNext);
-  on('btn-seq-teach', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); showToast('পাঠদান শুরু হয়েছে'); });
-  on('btn-seq-play', 'click', () => { sendPlay(LETTERS[S.seqIdx].id); });
-  on('btn-seq-stop', 'click', () => { stopPoll(); showToast('পাঠদান থামানো হয়েছে'); });
-  on('btn-seq-auto', 'click', () => {
-    S.autoAdvance = !S.autoAdvance;
-    el('btn-seq-auto').textContent = S.autoAdvance ? '⚡ অটো চালু' : '⚡ অটো';
-    el('btn-seq-auto').className = S.autoAdvance ? 'btn primary' : 'btn outline';
-  });
-
-  on('btn-rnd-play', 'click', () => {
-    if (S.rndSelected !== null) sendPlay(S.rndSelected);
-  });
-
-  wireCatTabs('rnd-cat-tabs', (cat) => {
-    S.rndFilter = cat;
-    renderLetterGrid('rnd-grid', cat, false);
-  });
 
   wireCatTabs('test-cat-tabs', (cat) => {
     S.testFilter = cat;
-    renderLetterGrid('test-sel-grid', cat, true);
+    renderLetterGrid('test-sel-grid', cat);
   });
 
   on('btn-test-rnd-sel', 'click', () => {
@@ -592,7 +443,7 @@ export function startTeacherApp() {
     const n = Math.min(10, filtered.length);
     const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, n);
     S.testSelected = new Set(shuffled.map((l) => l.id));
-    renderLetterGrid('test-sel-grid', S.testFilter, true);
+    renderLetterGrid('test-sel-grid', S.testFilter);
     updateTestSelCount();
     if (shuffled.length > 0) {
       const last = shuffled[shuffled.length - 1];
@@ -605,7 +456,7 @@ export function startTeacherApp() {
 
   on('btn-test-clear', 'click', () => {
     S.testSelected.clear();
-    renderLetterGrid('test-sel-grid', S.testFilter, true);
+    renderLetterGrid('test-sel-grid', S.testFilter);
     updateTestSelCount();
     el('test-sel-preview').classList.add('hidden');
   });
@@ -621,13 +472,17 @@ export function startTeacherApp() {
   on('ans-tab-c', 'click', () => resTab('correct'));
   on('ans-tab-w', 'click', () => resTab('wrong'));
   on('btn-res-retry', 'click', testInit);
-  on('btn-res-home', 'click', () => showScreen('learn'));
+  on('btn-res-home', 'click', testInit);
 
-  on('nav-dash', 'click', () => showScreen('learn'));
-  on('nav-learn', 'click', () => showScreen('learn'));
-  on('nav-test', 'click', testInit);
+  on('btn-change-student', 'click', () => {
+    const next = window.prompt('ছাত্রের কোড লিখুন (যেমন P01):', S.studentId);
+    if (next) setStudentId(next);
+  });
 
-  seqRender();
+  updateStudentBadge();
+  el('hdr-sub').textContent = `ছাত্র: ${S.studentId} • পরীক্ষা মোড`;
+  loadWeaknesses();
+  testInit();
   startPoll();
 
   return () => { cleanupFns.forEach((fn) => fn()); };

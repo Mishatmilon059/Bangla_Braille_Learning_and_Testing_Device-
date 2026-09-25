@@ -1,6 +1,16 @@
 // ====================================================================
 // AI-Assisted Bangla Braille Tutor - top lid, parametric
 //
+// SUPERSEDED: this file builds the top panel and its 48 mm skirt as one
+// merged solid. That duplicates top_panel.stl, which gets printed and
+// used on its own. The current three-piece enclosure is:
+//   1. top_panel.stl   -- the flat top panel (printed separately)
+//   2. case_walls.scad -- an open-top/open-bottom frame the panel rests on
+//   3. case_base.scad  -- the flat cover underneath
+// Use case_walls.scad + case_base.scad for a new build; this file is kept
+// for reference (and for anyone who wants a single all-printed top half
+// instead of a separate panel).
+//
 // This is the TOP half only: a rounded shell with a downward skirt and
 // every component hole in its top face. Nothing decorative -- no text,
 // no engraved zones, no dividers. Just the shell and the cutouts.
@@ -87,6 +97,18 @@ module screw_cutouts() {
             cylinder(d = SCREW_DIA, h = cut_h);
 }
 
+// Wire pass-through: a round hole through the back wall, offset to one
+// side rather than centred, for the power/USB cable to leave the case.
+wire_hole_dia = 8.0;
+wire_hole_x   = 40;   // off to one side of the back wall, not its centre (105)
+wire_hole_z   = 20;   // within the wall's solid height, clear of the top cap
+
+module wire_pass_hole() {
+    translate([wire_hole_x, case_depth - wall_thickness - 1, wire_hole_z])
+        rotate([-90, 0, 0])
+            cylinder(d = wire_hole_dia, h = wall_thickness + 2, $fn = 48);
+}
+
 
 // --- Assembly -------------------------------------------------------
 
@@ -107,6 +129,7 @@ module top_lid() {
         button_cutouts();
         speaker_grill();
         screw_cutouts();
+        wire_pass_hole();
     }
 }
 

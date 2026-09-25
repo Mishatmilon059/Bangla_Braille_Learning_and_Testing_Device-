@@ -1,198 +1,132 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { startLearnApp } from "./learnApp";
+import { useEffect } from "react";
+import { startLearnScreenApp } from "./learnScreenApp";
 
-export default function LearnPage() {
-  const [bootGen, setBootGen] = useState(0);
-
+// The "শেখা" tab: a live hardware teaching session. Moved out of the
+// teacher panel's old "শেখানো" tab so this nav item does exactly one thing
+// (teach), separate from "শিক্ষক" (which now only runs exams).
+export default function LearnScreenPage() {
   useEffect(() => {
-    // Guards React StrictMode's dev double-invoke from double-booting the
-    // app (double KeyPad/AttemptLogger construction would double-register
-    // listeners). Each real bootGen change still gets a fresh mount.
-    const cleanup = startLearnApp({ rerun: () => setBootGen((g) => g + 1) });
+    const cleanup = startLearnScreenApp();
     return cleanup;
-  }, [bootGen]);
+  }, []);
 
   return (
-    <div className="dark-app">
-      <div className="wrap">
-        <header>
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
-            <h1>বাংলা ব্রেইল</h1>
-          </Link>
-          <span className="grow"></span>
-          <div className="user-badge" id="userBadge">
-            <div className="avatar" id="userAvatar"></div>
-            <div>
-              <div className="uname" id="userName"></div>
-              <div className="uid" id="userIdDisplay"></div>
-            </div>
-            <button className="ghost" id="changeProfileBtn" type="button">পরিবর্তন</button>
+    <div className="teacher-app">
+      {/* ══════════════ HEADER ══════════════ */}
+      <header className="app-hdr">
+        <div className="hdr1">
+          <button className="btn-back" id="btn-back" type="button">←</button>
+          <span className="hdr-title" id="hdr-title">সহজ পাঠ</span>
+          <div className="esp-badge off" id="esp-badge">
+            <div className="esp-dot off" id="esp-dot"></div>
+            <span id="esp-label">ESP32 খুঁজছে...</span>
           </div>
-          <span className="sync-status" id="syncStatus">not started</span>
-        </header>
-
-        {/* ---------------- setup ---------------- */}
-        <div className="panel" id="setup">
-          <h2>অনুশীলন শুরু করুন</h2>
-          <div className="row">
-            <div>
-              <label htmlFor="mode">মোড</label>
-              <select id="mode" defaultValue="normal">
-                <option value="normal">স্বাভাবিক</option>
-                <option value="targeted">লক্ষ্যভিত্তিক</option>
-                <option value="review">পুনরালোচনা</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="setLen">প্রতি সেশনে attempts</label>
-              <input id="setLen" type="number" defaultValue={20} min={5} max={100} />
-            </div>
-            <div>
-              <label htmlFor="charSet">অক্ষর সেট</label>
-              <select id="charSet" defaultValue="all">
-                <option value="vowels">স্বরবর্ণ (১১)</option>
-                <option value="all">সব অক্ষর (৫০)</option>
-                <option value="consonants">ব্যঞ্জনবর্ণ (৩৯)</option>
-              </select>
-            </div>
-          </div>
-          <div className="actions">
-            <button id="startBtn" type="button">▶ সেশন শুরু করো</button>
-            <button id="exportBtn" className="ghost" type="button">CSV ডাউনলোড</button>
-            <button id="flushBtn" className="ghost" type="button">Sync করো</button>
-            <button id="resetBtn" className="ghost" type="button">রিসেট</button>
-          </div>
-          <p className="note" id="modeNote"></p>
         </div>
+        <div className="hdr2" id="hdr-sub">ছাত্র: S01 • বর্ণমালা শিক্ষা</div>
+        <div className="student-switch">
+          <span className="student-switch-lbl">সক্রিয় ছাত্র:</span>
+          <span className="student-switch-id" id="student-id-label">S01</span>
+          <button className="student-switch-btn" id="btn-change-student" type="button">পরিবর্তন</button>
+        </div>
+      </header>
 
-        {/* ---------------- practice ---------------- */}
-        <div className="panel" id="practice">
-          <h2>Attempt <span id="attemptNo">1</span> / <span id="attemptTotal">20</span>
-            &nbsp;·&nbsp; difficulty <span id="diffLevel">1</span></h2>
+      <main className="main">
+        <div id="screen-learn" className="screen active">
+          <div className="tab-pills">
+            <button className="tab-pill active" id="tp-seq" type="button">ক্রমানুসারে (১, ২, ৩...)</button>
+            <button className="tab-pill" id="tp-rnd" type="button">এলোমেলো (Random)</button>
+          </div>
 
-          <div className="stage">
-            <div className="left">
-              <div className="prompt-char" id="promptChar">?</div>
-              <div className="prompt-name" id="promptName">শুনুন ও লিখুন</div>
-              <div className="cell" id="cell">
-                <div className="dot" data-dot="1">1</div><div className="dot" data-dot="4">4</div>
-                <div className="dot" data-dot="2">2</div><div className="dot" data-dot="5">5</div>
-                <div className="dot" data-dot="3">3</div><div className="dot" data-dot="6">6</div>
+          {/* Sequential panel */}
+          <div id="panel-seq">
+            <div className="card">
+              <div className="card-lbl-row">
+                <span className="card-lbl">বর্তমান পাঠ</span>
+                <span className="text-xs" id="seq-label">বর্ণমালা নম্বর ১</span>
               </div>
-              <div className="actions" style={{ justifyContent: "center" }}>
-                <button id="replayBtn" className="ghost" type="button">🔊 আবার শুনুন</button>
+              <div className="char-display">
+                <div className="char-bn" id="seq-char">অ</div>
+                <div className="char-sub" id="seq-name">স্বরবর্ণ</div>
+                <div className="text-xs hidden" id="seq-prefix" style={{ color: "var(--amber)", marginTop: 4 }}></div>
+              </div>
+              <div className="center" id="seq-dots"></div>
+              <div className="badge-row">
+                <div className="badge green hidden" id="seq-match-badge">✓ সঠিক ইনপুট (ESP32)</div>
+                <button className="badge amber" id="btn-seq-play" type="button">🔊 উচ্চারণ শুনুন</button>
               </div>
             </div>
 
-            <div className="right">
-              <div className="keys">
-                <div className="key" data-dot="1">Dot 1<span className="kb">F / Num 7</span></div>
-                <div className="key" data-dot="4">Dot 4<span className="kb">J / Num 8</span></div>
-                <div className="key" data-dot="2">Dot 2<span className="kb">D / Num 4</span></div>
-                <div className="key" data-dot="5">Dot 5<span className="kb">K / Num 5</span></div>
-                <div className="key" data-dot="3">Dot 3<span className="kb">S / Num 1</span></div>
-                <div className="key" data-dot="6">Dot 6<span className="kb">L / Num 2</span></div>
+            <div className="result-panel hidden" id="seq-result">
+              <div className="result-top">
+                <span className="action-badge wait" id="seq-action">—</span>
+                <span className="conf-text" id="seq-conf"></span>
               </div>
-
-              <div className="actions">
-                <button id="submitBtn" type="button">Submit <span className="mono" style={{ opacity: 0.8 }}>↵</span></button>
-                <button id="clearBtn" className="ghost" type="button">Clear <span className="mono" style={{ opacity: 0.8 }}>esc</span></button>
-                <button id="hintBtn" className="ghost" type="button">Hint <span className="mono" style={{ opacity: 0.8 }}>H</span></button>
-                <button id="stopBtn" className="ghost" type="button">সেশন শেষ করো</button>
+              <div className="hint-line hidden" id="seq-hint"></div>
+              <div className="match-line hidden" id="seq-match-line"></div>
+              <div className="dots-row hidden" id="seq-dots-cmp">
+                <div><div className="dots-lbl">দেওয়া</div><div id="seq-dots-ent"></div></div>
+                <div><div className="dots-lbl">সঠিক</div><div id="seq-dots-exp"></div></div>
               </div>
+            </div>
 
-              <div className="hint-box" id="hintBox"></div>
-              <div className="feedback" id="feedback"></div>
+            <div className="card">
+              <div className="prog-row">
+                <span id="seq-progress">অগ্রগতি: ১/৫০</span>
+                <span id="seq-pct">২%</span>
+              </div>
+              <div className="prog-bg"><div className="prog-fill" id="seq-bar" style={{ width: "2%" }}></div></div>
+            </div>
+
+            <div className="btn-row">
+              <button className="btn outline" id="btn-seq-prev" type="button">← আগে</button>
+              <button className="btn outline" id="btn-seq-auto" type="button">⚡ অটো</button>
+              <button className="btn outline" id="btn-seq-next" type="button">পরে →</button>
+            </div>
+            <button className="btn primary" id="btn-seq-teach" type="button">▶ পাঠদান শুরু করুন</button>
+            <button className="btn danger" id="btn-seq-stop" type="button">✕ পাঠদান থামান</button>
+
+            <div className="warn-card">
+              <div className="warn-title">ℹ️ শুধু হার্ডওয়্যার ইনপুট</div>
+              <div className="warn-body">ছাত্র ESP32-এর পুশ বাটনে ডট চাপবে এবং SUBMIT চাপবে। ওয়েব থেকে কোনো ইনপুট দেওয়ার সুযোগ নেই।</div>
             </div>
           </div>
-        </div>
 
-        {/* ---------------- live stats ---------------- */}
-        <div className="panel">
-          <h2>অগ্রগতি</h2>
-          <div className="stats">
-            <div className="stat"><div className="v" id="stRows">0</div><div className="k">মোট attempt</div></div>
-            <div className="stat"><div className="v" id="stAcc">—</div><div className="k">নির্ভুলতা</div></div>
-            <div className="stat"><div className="v" id="stSess">0</div><div className="k">সেশন</div></div>
-            <div className="stat"><div className="v" id="stDays">0</div><div className="k">দিন</div></div>
-            <div className="stat"><div className="v" id="stChars">0</div><div className="k">অক্ষর দেখা</div></div>
-            <div className="stat"><div className="v" id="stQueue">0</div><div className="k">sync বাকি</div></div>
-          </div>
-        </div>
-
-        {/* ---------------- per-character mastery (collapsible) ---------------- */}
-        <CollapsiblePanel title="অক্ষরভিত্তিক দক্ষতা">
-          <div className="tbl-wrap">
-            <table id="charTable">
-              <thead><tr>
-                <th>অক্ষর</th><th>নাম</th><th className="num">seen</th><th className="num">acc</th>
-                <th style={{ width: 110 }}>mastery</th><th className="num">streak</th><th className="num">ভুল</th>
-              </tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </CollapsiblePanel>
-
-        {/* ---------------- class balance (collapsible) ---------------- */}
-        <CollapsiblePanel title="ডেটা ব্যালেন্স">
-          <div className="row">
-            <div className="tbl-wrap">
-              <table id="taTable">
-                <thead><tr><th>Teaching action</th><th className="num">rows</th><th style={{ width: 90 }}></th></tr></thead>
-                <tbody></tbody>
-              </table>
+          {/* Random panel */}
+          <div id="panel-rnd" className="hidden">
+            <div className="sel-card hidden" id="rnd-sel-card">
+              <div className="sel-char" id="rnd-char">ক</div>
+              <div className="sel-info">
+                <div className="sel-info-lbl">নির্বাচিত বর্ণ</div>
+                <div className="sel-info-name" id="rnd-name">ব্যঞ্জনবর্ণ</div>
+              </div>
+              <button className="badge amber" id="btn-rnd-play" type="button">🔊</button>
             </div>
-            <div className="tbl-wrap">
-              <table id="csTable">
-                <thead><tr><th>Confidence state</th><th className="num">rows</th><th style={{ width: 90 }}></th></tr></thead>
-                <tbody></tbody>
-              </table>
+
+            <div className="result-panel hidden" id="rnd-result">
+              <div className="result-top">
+                <span className="action-badge wait" id="rnd-action">অপেক্ষায়...</span>
+                <span className="conf-text" id="rnd-conf"></span>
+              </div>
+              <div className="hint-line hidden" id="rnd-hint"></div>
+              <div className="dots-row hidden" id="rnd-dots-cmp">
+                <div><div className="dots-lbl">দেওয়া</div><div id="rnd-dots-ent"></div></div>
+                <div><div className="dots-lbl">সঠিক</div><div id="rnd-dots-exp"></div></div>
+              </div>
             </div>
-          </div>
-        </CollapsiblePanel>
-      </div>
 
-      {/* ---------------- profile screen overlay ---------------- */}
-      <div id="profileScreen" className="gate-screen hidden">
-        <div className="gate-card">
-          <div className="dots6">
-            <span className="on"></span><span></span>
-            <span className="on"></span><span className="on"></span>
-            <span></span><span className="on"></span>
+            <div className="cat-tabs" id="rnd-cat-tabs">
+              <button className="cat-tab active" data-cat="all" type="button">সব (৫০)</button>
+              <button className="cat-tab" data-cat="vowel" type="button">স্বরবর্ণ (১১)</button>
+              <button className="cat-tab" data-cat="consonant" type="button">ব্যঞ্জনবর্ণ (৩৯)</button>
+            </div>
+            <div className="letter-grid" id="rnd-grid"></div>
           </div>
-          <h1>বাংলা ব্রেইল</h1>
-          <p>অনুশীলন শুরু করার আগে আপনার তথ্য দিন</p>
-          <div className="gate-field">
-            <label htmlFor="profileName">আপনার নাম</label>
-            <input id="profileName" placeholder="যেমন: রাহেলা" autoComplete="name" />
-          </div>
-          <div className="gate-field">
-            <label htmlFor="profileId">আইডি</label>
-            <input id="profileId" placeholder="যেমন: S01" autoComplete="off" style={{ textTransform: "uppercase" }} />
-          </div>
-          <button id="profileSaveBtn" type="button" style={{ width: "100%", marginTop: 8, padding: 14, fontSize: "1rem" }}>শুরু করো →</button>
         </div>
-      </div>
-    </div>
-  );
-}
+      </main>
 
-function CollapsiblePanel({ title, children }: { title: string; children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(true);
-  return (
-    <div className="panel">
-      <h2>
-        {title}
-        <button className="panel-toggle" type="button" onClick={() => setCollapsed((c) => !c)}>
-          {collapsed ? "▾ দেখাও" : "▴ লুকাও"}
-        </button>
-      </h2>
-      <div className="collapsible-body" style={{ maxHeight: collapsed ? 0 : 2000, overflow: "hidden", transition: "max-height 0.3s ease" }}>
-        {children}
-      </div>
+      <div className="toast" id="toast"></div>
     </div>
   );
 }

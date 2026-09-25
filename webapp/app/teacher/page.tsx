@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { startTeacherApp } from "./teacherApp";
 
+// The "শিক্ষক" tab: exam/test flow only (select letters -> run test ->
+// results). Teaching a letter for the first time is a different feature and
+// now lives at "শেখা" (webapp/app/learn/).
 export default function TeacherPage() {
   useEffect(() => {
     const cleanup = startTeacherApp();
@@ -16,111 +18,23 @@ export default function TeacherPage() {
       <header className="app-hdr">
         <div className="hdr1">
           <button className="btn-back" id="btn-back" type="button">←</button>
-          <span className="hdr-title" id="hdr-title">সহজ পাঠ</span>
-          <div className="esp-badge" id="esp-badge">
-            <div className="esp-dot" id="esp-dot"></div>
-            <span id="esp-label">ESP32 সংযুক্ত</span>
+          <span className="hdr-title" id="hdr-title">বর্ণ নির্বাচন</span>
+          <div className="esp-badge off" id="esp-badge">
+            <div className="esp-dot off" id="esp-dot"></div>
+            <span id="esp-label">ESP32 খুঁজছে...</span>
           </div>
         </div>
-        <div className="hdr2" id="hdr-sub">ছাত্র: S01 • বর্ণমালা শিক্ষা</div>
+        <div className="hdr2" id="hdr-sub">ছাত্র: S01 • পরীক্ষা মোড</div>
+        <div className="student-switch">
+          <span className="student-switch-lbl">সক্রিয় ছাত্র:</span>
+          <span className="student-switch-id" id="student-id-label">S01</span>
+          <button className="student-switch-btn" id="btn-change-student" type="button">পরিবর্তন</button>
+        </div>
       </header>
 
       <main className="main">
-        {/* ████ LEARN SCREEN ████ */}
-        <div id="screen-learn" className="screen active">
-          <div className="tab-pills">
-            <button className="tab-pill active" id="tp-seq" type="button">ক্রমানুসারে (১, ২, ৩...)</button>
-            <button className="tab-pill" id="tp-rnd" type="button">এলোমেলো (Random)</button>
-          </div>
-
-          {/* Sequential panel */}
-          <div id="panel-seq">
-            <div className="card">
-              <div className="card-lbl-row">
-                <span className="card-lbl">বর্তমান পাঠ</span>
-                <span className="text-xs" id="seq-label">বর্ণমালা নম্বর ১</span>
-              </div>
-              <div className="char-display">
-                <div className="char-bn" id="seq-char">অ</div>
-                <div className="char-sub" id="seq-name">স্বরবর্ণ</div>
-                <div className="text-xs hidden" id="seq-prefix" style={{ color: "var(--amber)", marginTop: 4 }}></div>
-              </div>
-              <div className="center" id="seq-dots"></div>
-              <div className="badge-row">
-                <div className="badge green hidden" id="seq-match-badge">✓ সঠিক ইনপুট (ESP32)</div>
-                <button className="badge amber" id="btn-seq-play" type="button">🔊 উচ্চারণ শুনুন</button>
-              </div>
-            </div>
-
-            <div className="result-panel hidden" id="seq-result">
-              <div className="result-top">
-                <span className="action-badge wait" id="seq-action">—</span>
-                <span className="conf-text" id="seq-conf"></span>
-              </div>
-              <div className="hint-line hidden" id="seq-hint"></div>
-              <div className="match-line hidden" id="seq-match-line"></div>
-              <div className="dots-row hidden" id="seq-dots-cmp">
-                <div><div className="dots-lbl">দেওয়া</div><div id="seq-dots-ent"></div></div>
-                <div><div className="dots-lbl">সঠিক</div><div id="seq-dots-exp"></div></div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="prog-row">
-                <span id="seq-progress">অগ্রগতি: ১/৫০</span>
-                <span id="seq-pct">২%</span>
-              </div>
-              <div className="prog-bg"><div className="prog-fill" id="seq-bar" style={{ width: "2%" }}></div></div>
-            </div>
-
-            <div className="btn-row">
-              <button className="btn outline" id="btn-seq-prev" type="button">← আগে</button>
-              <button className="btn outline" id="btn-seq-auto" type="button">⚡ অটো</button>
-              <button className="btn outline" id="btn-seq-next" type="button">পরে →</button>
-            </div>
-            <button className="btn primary" id="btn-seq-teach" type="button">▶ পাঠদান শুরু করুন</button>
-            <button className="btn danger" id="btn-seq-stop" type="button">✕ পাঠদান থামান</button>
-
-            <div className="warn-card">
-              <div className="warn-title">ℹ️ শুধু হার্ডওয়্যার ইনপুট</div>
-              <div className="warn-body">ছাত্র ESP32-এর পুশ বাটনে ডট চাপবে এবং SUBMIT চাপবে। ওয়েব থেকে কোনো ইনপুট দেওয়ার সুযোগ নেই।</div>
-            </div>
-          </div>
-
-          {/* Random panel */}
-          <div id="panel-rnd" className="hidden">
-            <div className="sel-card hidden" id="rnd-sel-card">
-              <div className="sel-char" id="rnd-char">ক</div>
-              <div className="sel-info">
-                <div className="sel-info-lbl">নির্বাচিত বর্ণ</div>
-                <div className="sel-info-name" id="rnd-name">ব্যঞ্জনবর্ণ</div>
-              </div>
-              <button className="badge amber" id="btn-rnd-play" type="button">🔊</button>
-            </div>
-
-            <div className="result-panel hidden" id="rnd-result">
-              <div className="result-top">
-                <span className="action-badge wait" id="rnd-action">অপেক্ষায়...</span>
-                <span className="conf-text" id="rnd-conf"></span>
-              </div>
-              <div className="hint-line hidden" id="rnd-hint"></div>
-              <div className="dots-row hidden" id="rnd-dots-cmp">
-                <div><div className="dots-lbl">দেওয়া</div><div id="rnd-dots-ent"></div></div>
-                <div><div className="dots-lbl">সঠিক</div><div id="rnd-dots-exp"></div></div>
-              </div>
-            </div>
-
-            <div className="cat-tabs" id="rnd-cat-tabs">
-              <button className="cat-tab active" data-cat="all" type="button">সব (৫০)</button>
-              <button className="cat-tab" data-cat="vowel" type="button">স্বরবর্ণ (১১)</button>
-              <button className="cat-tab" data-cat="consonant" type="button">ব্যঞ্জনবর্ণ (৩৯)</button>
-            </div>
-            <div className="letter-grid" id="rnd-grid"></div>
-          </div>
-        </div>
-
         {/* ████ TEST SELECT SCREEN ████ */}
-        <div id="screen-test-select" className="screen">
+        <div id="screen-test-select" className="screen active">
           <div className="sel-card hidden" id="test-sel-preview">
             <div className="sel-char" id="test-sel-char">—</div>
             <div className="sel-info">
@@ -214,25 +128,9 @@ export default function TeacherPage() {
 
           <div className="auto-report">✓ অটোমেটিক রিপোর্ট পাঠানো হয়েছে</div>
           <button className="btn primary" id="btn-res-retry" type="button">পুনরায় পরীক্ষা দিন</button>
-          <button className="btn outline" id="btn-res-home" type="button">হোমে ফিরে যান</button>
+          <button className="btn outline" id="btn-res-home" type="button">নতুন পরীক্ষা</button>
         </div>
       </main>
-
-      {/* ══════════════ BOTTOM NAV ══════════════ */}
-      <nav className="bottom-nav">
-        <button className="nav-btn" id="nav-dash" type="button">
-          <span className="nav-icon">⊞</span><span className="nav-lbl">ড্যাশবোর্ড</span>
-        </button>
-        <button className="nav-btn active" id="nav-learn" type="button">
-          <span className="nav-icon">📖</span><span className="nav-lbl">শেখানো</span>
-        </button>
-        <button className="nav-btn" id="nav-test" type="button">
-          <span className="nav-icon">📝</span><span className="nav-lbl">পরীক্ষা</span>
-        </button>
-        <Link href="/" className="nav-btn" id="nav-info">
-          <span className="nav-icon">ℹ️</span><span className="nav-lbl">নির্দেশনা</span>
-        </Link>
-      </nav>
 
       <div className="toast" id="toast"></div>
     </div>

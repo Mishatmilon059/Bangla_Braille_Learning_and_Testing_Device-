@@ -1,4 +1,4 @@
-﻿# AI Driven Bangla Braille Learning Device
+# AI Driven Bangla Braille Learning Device
 
 **Department of Electrical and Electronic Engineering (EEE)**  
 **Bangladesh University of Engineering and Technology (BUET)**  
@@ -85,7 +85,7 @@ web JS   Py Gen   C Header  assets/braille/*.svg         sd_card/mp3/
  └──────────────────────────────────────┘
 ```
 
-Detailed architectural vector diagrams (SVG and high-resolution PNG) are located in [`docs/diagrams_v2/`](docs/diagrams_v2/).
+Detailed architectural vector diagrams (SVG and PNG) are located in [`docs/diagrams/`](docs/diagrams/).
 
 ---
 
@@ -197,16 +197,13 @@ $$\mathbf{x} \in \mathbb{R}^8 \longrightarrow \text{Dense}(32, \text{ReLU}) \lon
 │   ├── synthetic_2k.csv             # 1,242 synthetic rows matched to empirical distributions
 │   └── synthetic_targeted.csv       # Targeted rare-class training samples
 ├── docs/
-│   ├── diagrams/                    # System diagrams v1 (PNG & SVG)
-│   ├── diagrams_v2/                 # High-resolution diagrams (Architecture, BOM, Flow)
+│   ├── diagrams/                    # System diagrams (PNG & SVG)
 │   ├── presentation/                # Academic presentation slide decks and progress reports
 │   │   ├── BraillePresentation.pptx # Technical presentation slides
 │   │   ├── EEE416_G8_FinalDemo.pptx # Final demonstration deck
 │   │   └── G8 Project Progress.pdf  # Project milestone documentation
-│   ├── screenshots/                 # Web interface and teacher dashboard captures
 │   ├── FINAL_DEMO_CHECKLIST.md      # Hardware demonstration and QA checklist
-│   ├── PROJECT_REPORT.md            # Comprehensive scientific technical report
-│   └── TEAM_TECHNICAL_GUIDE.md      # File-by-file technical guide and viva Q&A
+│   └── PROJECT_REPORT.md            # Comprehensive scientific technical report
 ├── enclosure/
 │   ├── 3d_preview.html              # Interactive Three.js 3D web preview of the enclosure
 │   ├── braille_tutor_case.scad      # OpenSCAD 3D parametric desk console case
@@ -225,6 +222,7 @@ $$\mathbf{x} \in \mathbb{R}^8 \longrightarrow \text{Dense}(32, \text{ReLU}) \lon
 │   │   ├── platformio.ini           # PlatformIO project configuration
 │   │   └── rule_engine.h            # [Generated] Feature normalizer & rule fallback logic
 │   ├── t11_ml_test/                 # Side-by-side firmware comparing TinyML decisions vs rule engine
+│   ├── t12_ml_complete/             # t11_ml_test + per-student personalization (real student_id, saved mastery per student)
 │   └── tests/                       # Staged bring-up sketches (t1_blink to t11_testing)
 ├── models/
 │   ├── golden_vectors.json          # 20 boot self-test vectors with expected model outputs

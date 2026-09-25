@@ -8,7 +8,38 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; min-height: 100%; }
 body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+/* Bottom clearance for .global-bottom-nav is added inside each theme's own
+   full-height wrapper (.dark-app .wrap / .teacher-app .main), not here --
+   body has no background of its own, so padding added directly on body
+   exposes bare transparent html/body past the themed wrapper's own height. */
 a { color: inherit; }
+
+/* ==========================================================================
+   GLOBAL BOTTOM NAV -- present on every page (Home/Learn/Teacher/Students),
+   theme-agnostic (dark glass) so it reads consistently whether the page
+   above it is the dark-app or light teacher-app theme. This is what makes
+   the four pages feel like one connected app instead of four disconnected
+   pages one screenshot away from each other.
+   ========================================================================== */
+.global-bottom-nav {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 100%; max-width: 430px; z-index: 1000;
+  display: flex; justify-content: space-around;
+  padding: 8px 4px calc(6px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid transparent;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.05), 0 -8px 24px rgba(0, 0, 0, 0.06);
+}
+.gbn-item {
+  flex: 1; max-width: 90px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: none; cursor: pointer; padding: 5px 2px; border-radius: 10px;
+  color: #94a3b8; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease;
+}
+.gbn-item .gbn-label { font-size: 10px; font-weight: 600; }
+.gbn-item.active { color: #16a34a; }
+.gbn-item:active { background: rgba(22, 163, 74, 0.08); }
 
 /* ==========================================================================
    DARK THEME -- Home (welcome) + Learn (profile/practice) pages
@@ -44,7 +75,7 @@ a { color: inherit; }
   line-height: 1.6;
   font-size: 16px;
 }
-.dark-app .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 72px; }
+.dark-app .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 88px; }
 .dark-app a { text-decoration: none; }
 
 .dark-app header {
@@ -314,8 +345,71 @@ a { color: inherit; }
 .teacher-app .esp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .teacher-app .esp-dot.off { background: #9ca3af; }
 .teacher-app .hdr2 { font-size: 12px; color: var(--text2); padding-left: 30px; margin-top: 2px; }
+.teacher-app .student-switch { display: flex; align-items: center; gap: 6px; padding: 8px 0 2px 30px; }
+.teacher-app .student-switch-lbl { font-size: 11px; color: var(--text2); }
+.teacher-app .student-switch-id { font-size: 12px; font-weight: 700; color: var(--blue); background: var(--blue-light); padding: 2px 8px; border-radius: 10px; }
+.teacher-app .student-switch-btn { margin-left: auto; margin-right: 14px; font-size: 11px; font-weight: 600; color: var(--blue); background: none; border: 1px solid var(--blue); border-radius: 8px; padding: 3px 9px; cursor: pointer; }
+.teacher-app .student-switch-btn:hover { background: var(--blue-light); }
 
-.teacher-app .main { padding: 12px 14px 86px; }
+/* Students roster + profile (webapp/app/students) */
+.teacher-app .dashboard-stats { display: flex; padding: 16px 8px; margin-bottom: 12px; }
+.teacher-app .dstat { flex: 1; text-align: center; }
+.teacher-app .dstat-v { font-size: 20px; font-weight: 800; color: var(--green-dark); }
+.teacher-app .dstat-l { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.teacher-app .student-card { padding: 0; overflow: hidden; }
+.teacher-app .student-row {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; background: none; border: none; cursor: pointer; text-align: left; font: inherit; color: var(--text);
+}
+.teacher-app .student-rank {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--bg); color: var(--text2);
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.teacher-app .student-rank.gold { background: #fef3c7; color: #b45309; }
+.teacher-app .student-row-id { font-weight: 700; font-size: 14px; }
+.teacher-app .student-row-stats { flex: 1; display: flex; gap: 14px; align-items: center; font-size: 12.5px; color: var(--text2); }
+.teacher-app .text-good { color: var(--green-dark); font-weight: 700; }
+.teacher-app .text-medium { color: var(--amber); font-weight: 700; }
+.teacher-app .text-poor { color: var(--red); font-weight: 700; }
+.teacher-app .student-row-caret { color: var(--text2); font-size: 11px; }
+.teacher-app .student-profile { padding: 4px 16px 16px; border-top: 1px solid var(--border); }
+.teacher-app .mastery-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin: 12px 0; }
+.teacher-app .mastery-dot {
+  aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: #fff; background: #d1d5db; cursor: default;
+}
+.teacher-app .mastery-dot.tier-none { background: #e5e7eb; color: #9ca3af; }
+.teacher-app .mastery-dot.tier-poor { background: var(--red); }
+.teacher-app .mastery-dot.tier-medium { background: var(--amber); }
+.teacher-app .mastery-dot.tier-good { background: var(--green); }
+/* Roster-level ranking chart (overview dashboard) */
+.teacher-app .ranking-chart { padding: 14px 16px; }
+.teacher-app .rank-bar-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+.teacher-app .rank-bar-id { width: 34px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.teacher-app .rank-bar-track { flex: 1; height: 14px; background: var(--bg); border-radius: 7px; overflow: hidden; }
+.teacher-app .rank-bar-fill { height: 100%; background: var(--green); border-radius: 7px; transition: width 0.3s ease; }
+.teacher-app .rank-bar-fill.gold { background: #d97706; }
+.teacher-app .rank-bar-fill.weak { background: var(--red); }
+.teacher-app .rank-bar-pct { width: 38px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text2); flex-shrink: 0; }
+
+/* Per-student profile analytics */
+.teacher-app .profile-stat-row { display: flex; padding-top: 10px; }
+.teacher-app .pstat { flex: 1; text-align: center; }
+.teacher-app .pstat-v { font-size: 17px; font-weight: 800; }
+.teacher-app .pstat-l { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+.teacher-app .conf-bar { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--bg); }
+.teacher-app .conf-legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+.teacher-app .conf-legend span { font-size: 11px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; }
+.teacher-app .conf-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.teacher-app .latest-io { display: flex; gap: 14px; }
+.teacher-app .latest-io-col { flex: 1; min-width: 0; background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.teacher-app .latest-io-hdr { font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+.teacher-app .io-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; padding: 2px 0; }
+.teacher-app .io-row span { color: var(--text2); }
+.teacher-app .io-row b { font-weight: 700; white-space: nowrap; }
+
+.teacher-app .main { padding: 12px 14px 104px; }
 .teacher-app .screen { display: none; }
 .teacher-app .screen.active { display: block; }
 
@@ -435,11 +529,13 @@ a { color: inherit; }
 
 .teacher-app .auto-report { text-align: center; font-size: 12px; color: var(--green-dark); margin-bottom: 8px; }
 
-.teacher-app .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: var(--card); border-top: 1px solid var(--border); display: flex; padding: 8px 0 max(14px, env(safe-area-inset-bottom)); z-index: 50; }
-.teacher-app .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 5px 0; font-family: inherit; }
-.teacher-app .nav-icon { font-size: 22px; line-height: 1.1; }
-.teacher-app .nav-lbl  { font-size: 10px; font-weight: 500; color: var(--text2); }
-.teacher-app .nav-btn.active .nav-lbl { color: var(--green); font-weight: 700; }
+.teacher-app .section-tabs { display: flex; gap: 6px; padding: 10px 0 2px 30px; margin-right: 14px; }
+.teacher-app .section-tab {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 8px 4px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text2);
+  cursor: pointer; transition: all 0.15s ease;
+}
+.teacher-app .section-tab.active { background: var(--green); border-color: var(--green); color: #fff; }
 
 .teacher-app .toast { position: fixed; bottom: 74px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .2s; white-space: nowrap; z-index: 100; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
 .teacher-app .toast.show { opacity: 1; }
@@ -482,13 +578,13 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
+  padding: 32px 16px 96px;
   box-sizing: border-box;
 }
 
 .home-container {
   width: 100%;
-  max-width: 780px;
+  max-width: 430px;
   margin: 0 auto;
 }
 
@@ -767,4 +863,68 @@ a { color: inherit; }
   font-size: 0.82rem;
   color: var(--text-sub);
 }
+
+/* Class overview dashboard card -- summary + top/weak highlight, linking
+   through to the full /students dashboard for detail. */
+.home-overview-card {
+  display: block;
+  margin-top: 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  padding: 20px 22px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.home-overview-card:hover { border-color: var(--green); transform: translateY(-1px); }
+.home-overview-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.home-overview-hdr h3 { margin: 0; font-size: 1.02rem; font-weight: 700; color: var(--text-main); }
+.home-overview-more { font-size: 0.82rem; font-weight: 600; color: var(--green-dark); }
+.home-overview-stats { display: flex; border-bottom: 1px solid var(--border-light); padding-bottom: 16px; margin-bottom: 14px; }
+.ho-stat { flex: 1; text-align: center; }
+.ho-v { font-size: 1.4rem; font-weight: 800; color: var(--green-dark); }
+.ho-l { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
+.home-overview-highlights { display: flex; gap: 12px; flex-wrap: wrap; }
+.ho-hi { flex: 1; min-width: 140px; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; }
+.ho-hi-top { background: var(--green-bg); }
+.ho-hi-weak { background: #fef2f2; }
+.ho-hi-lbl { font-size: 0.76rem; color: var(--text-sub); flex: 1; }
+.ho-hi-id { font-size: 0.9rem; font-weight: 700; }
+.ho-hi-pct { font-size: 0.9rem; font-weight: 700; }
+.ho-hi-top .ho-hi-pct { color: var(--green-dark); }
+.ho-hi-weak .ho-hi-pct { color: #dc2626; }
+
+.home-rank-cols { display: flex; gap: 14px; }
+.home-rank-col { flex: 1; min-width: 0; }
+.home-rank-col-hdr { font-size: 0.76rem; font-weight: 700; margin-bottom: 6px; }
+.home-rank-col-hdr.top { color: var(--green-dark); }
+.home-rank-col-hdr.weak { color: #dc2626; }
+.home-rank-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 0.8rem; }
+.hr-i { width: 14px; color: var(--text-sub); font-size: 0.7rem; flex-shrink: 0; }
+.hr-id { flex: 1; font-weight: 600; color: var(--text-main); }
+.hr-pct { font-weight: 700; }
+.hr-pct.top { color: var(--green-dark); }
+.hr-pct.weak { color: #dc2626; }
+
+.home-feature-list {
+  margin: 12px 0 4px; padding: 0; list-style: none;
+  display: grid; gap: 8px;
+}
+.home-feature-list li {
+  position: relative; padding-left: 20px; font-size: 0.86rem; color: var(--text-muted); line-height: 1.5;
+}
+.home-feature-list li::before {
+  content: ""; position: absolute; left: 0; top: 8px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+}
+.hero-cta-line { margin-top: 14px !important; font-weight: 600; color: var(--text-main) !important; }
+
+.home-credit-card {
+  margin-top: 18px; text-align: center; padding: 18px 20px;
+  background: var(--card-bg); border: 1px solid var(--border-light); border-radius: 16px;
+}
+.home-credit-card p { margin: 0 0 10px; font-size: 0.82rem; color: var(--text-sub); line-height: 1.5; }
+.home-credit-names { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; }
+.home-credit-names span { font-size: 0.82rem; font-weight: 600; color: var(--green-dark); }
 

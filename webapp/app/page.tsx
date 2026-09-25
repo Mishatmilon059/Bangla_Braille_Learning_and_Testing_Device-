@@ -1,8 +1,17 @@
 ﻿"use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { loadRoster } from "./students/studentsApp";
 
 export default function HomePage() {
+  const [roster, setRoster] = useState<any[] | null>(null);
+  useEffect(() => {
+    loadRoster().then(setRoster);
+  }, []);
+
+  const top5 = roster ? roster.slice(0, 5) : [];
+
   return (
     <div className="home-screen">
       <div className="home-container">
@@ -17,7 +26,6 @@ export default function HomePage() {
               </div>
             </div>
             <div className="home-brand-text">
-              <span className="home-badge">BUET EEE 416 • Group 08</span>
               <h1>বাংলা ব্রেইল টিউটর</h1>
               <p>Bangla Braille Learning & Testing Device System</p>
             </div>
@@ -27,92 +35,63 @@ export default function HomePage() {
         {/* Hero Welcome Card */}
         <div className="home-hero-card">
           <div className="hero-content">
-            <h2>সহজ পদ্ধতিতে বাংলা ব্রেইল শিখুন ও মূল্যায়ন করুন</h2>
-            <p>
-              ৬-ডট হ্যাপটিক ভাইব্রেশন, সুস্পষ্ট কণ্ঠস্বর এবং ইন্টারেক্টিভ অনুশীলনের মাধ্যমে ব্রেইল চর্চা করার সম্পূর্ণ ব্যবস্থা। নিচের অপশন থেকে নির্বাচন করুন:
-            </p>
-          </div>
-
-          {/* Navigation Choices */}
-          <div className="home-grid">
-            {/* Learn Option */}
-            <Link href="/learn" className="home-card-link learn-card">
-              <div className="card-top">
-                <div className="card-icon-wrap green-grad">
-                  <span className="card-icon">📖</span>
-                </div>
-                <span className="card-pill green">শিক্ষার্থী মোড</span>
-              </div>
-              <div className="card-body">
-                <h3>ব্রেইল শেখা ও অনুশীলন</h3>
-                <p>
-                  বর্ণমালাভিত্তিক পাঠ, ৬-ডট কিপ্যাড ইনপুট, তাত্ক্ষণিক অডিও উচ্চারণ ও ভয়েস ফিডব্যাকের মাধ্যমে নিজে নিজে ব্রেইল শিখুন।
-                </p>
-              </div>
-              <div className="card-footer">
-                <span className="btn-action primary-btn">
-                  অনুশীলন শুরু করুন
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
-                </span>
-              </div>
-            </Link>
-
-            {/* Teacher Option */}
-            <Link href="/teacher" className="home-card-link teacher-card">
-              <div className="card-top">
-                <div className="card-icon-wrap emerald-outline">
-                  <span className="card-icon">👩‍🏫</span>
-                </div>
-                <span className="card-pill amber">শিক্ষক প্যানেল</span>
-              </div>
-              <div className="card-body">
-                <h3>ব্রেইল টেস্টিং ও মূল্যায়ন</h3>
-                <p>
-                  ESP32 হার্ডওয়্যার ডিভাইসের সাথে রিয়েল-টাইম সংযোগ, দূর থেকে পরীক্ষা পরিচালনা এবং শিক্ষার্থীদের দুর্বলতা ও স্কোর পর্যবেক্ষণ।
-                </p>
-              </div>
-              <div className="card-footer">
-                <span className="btn-action outline-btn">
-                  শিক্ষক ড্যাশবোর্ড
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
-                </span>
-              </div>
-            </Link>
-          </div>
-
-          {/* Feature Highlights Footer */}
-          <div className="home-features">
-            <div className="feature-item">
-              <span className="feature-dot"></span>
-              <span>৬-ডট হ্যাপটিক মোটর</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-dot"></span>
-              <span>স্বাভাবিক বাংলা অডিও</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-dot"></span>
-              <span>ESP32 ক্লাউড সিঙ্ক</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-dot"></span>
-              <span>অন-ডিভাইস AI মডেল</span>
-            </div>
+            <h2>বাংলা ব্রেইল কী?</h2>
+            <ul className="home-feature-list">
+              <li>৬-ডট সেল পদ্ধতি — প্রতিটি অক্ষর সর্বোচ্চ ৬টি ডটের সমন্বয়ে গঠিত</li>
+              <li>মোট ৫০টি মূল অক্ষর — ১১টি স্বরবর্ণ ও ৩৯টি ব্যঞ্জনবর্ণ/চিহ্ন</li>
+              <li>কিছু অক্ষর (যেমন ঋ, ৎ) দুই-ধাপে শেখানো হয় — একটি নির্দেশক ডট, তারপর মূল প্যাটার্ন</li>
+              <li>স্পর্শ (ভাইব্রেশন) ও শ্রবণ (অডিও) — দুই মাধ্যমেই শেখার সুযোগ</li>
+            </ul>
           </div>
         </div>
 
-        {/* Footer info */}
-        <footer className="home-footer">
-          <p>
-            তত্ত্বাবধানে: ডিপার্টমেন্ট অব EEE, বাংলাদেশ প্রকৌশল বিশ্ববিদ্যালয় (BUET)
-          </p>
-        </footer>
+        {/* Overview dashboard -- so a teacher opening the app sees the class
+            state immediately, without having to go into "শিক্ষার্থী" first. */}
+        {roster && roster.length > 0 && (
+          <Link href="/students" className="home-overview-card">
+            <div className="home-overview-hdr">
+              <h3>শ্রেণির ওভারভিউ</h3>
+              <span className="home-overview-more">বিস্তারিত দেখুন →</span>
+            </div>
+            <div className="home-overview-stats">
+              <div className="ho-stat">
+                <div className="ho-v">{roster.length}</div>
+                <div className="ho-l">শিক্ষার্থী</div>
+              </div>
+              <div className="ho-stat">
+                <div className="ho-v">{roster.reduce((a, s) => a + s.total, 0)}</div>
+                <div className="ho-l">মোট attempt</div>
+              </div>
+              <div className="ho-stat">
+                <div className="ho-v">
+                  {Math.round((roster.reduce((a, s) => a + s.accuracy, 0) / roster.length) * 100)}%
+                </div>
+                <div className="ho-l">গড় নির্ভুলতা</div>
+              </div>
+            </div>
+            <div className="home-rank-col">
+              <div className="home-rank-col-hdr top">শীর্ষ ৫</div>
+              {top5.map((s, i) => (
+                <div className="home-rank-row" key={s.studentId}>
+                  <span className="hr-i">{i + 1}</span>
+                  <span className="hr-id">{s.studentId}</span>
+                  <span className="hr-pct top">{Math.round(s.accuracy * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          </Link>
+        )}
+
+        {/* Project credit */}
+        <div className="home-credit-card">
+          <p>This app is developed for the EEE 416 course by:</p>
+          <div className="home-credit-names">
+            <span>Mishat Hasan Milon</span>
+            <span>Khalid Mehebub</span>
+            <span>Md. Adib Hasan Audhi</span>
+            <span>Santu Nag</span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bangla Braille Tutor — Base, Walls &amp; Complete Assembly (3D Preview)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #111827;
+    color: #f3f4f6;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 12px 24px;
+    background: #1f2937;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #374151;
+    z-index: 10;
+  }
+  h1 { font-size: 1.05rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.5px; }
+  .badge { background: #2563eb; color: white; padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+  #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; }
+
+  .ui-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(31, 41, 55, 0.92);
+    backdrop-filter: blur(12px);
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #4b5563;
+    width: 300px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+  }
+  .ui-panel h3 { font-size: 0.9rem; margin-bottom: 10px; color: #f9fafb; border-bottom: 1px solid #374151; padding-bottom: 8px; }
+  .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .btn {
+    background: #374151;
+    border: 1px solid #4b5563;
+    color: #f3f4f6;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn:hover { background: #2563eb; border-color: #60a5fa; color: white; }
+  .btn.active { background: #2563eb; border-color: #60a5fa; }
+  .btn-full { grid-column: span 2; }
+
+  .info-footer {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(31, 41, 55, 0.92);
+    backdrop-filter: blur(12px);
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px solid #4b5563;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: #d1d5db;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    max-width: 360px;
+  }
+  .note {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(120, 53, 15, 0.9);
+    color: #fef3c7;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    max-width: 300px;
+    z-index: 10;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Bangla Braille Tutor — Enclosure Preview</h1>
+    <small style="color: #9ca3af;">Base cover + side walls (to print) + top panel (already printed), same numbers as the .scad files</small>
+  </div>
+  <span class="badge" id="dims-badge">Base only · 210 × 140 × 2.8 mm</span>
+</header>
+
+<div id="canvas-container">
+  <div class="note">Geometric preview from enclosure/case_base.scad + case_walls.scad + top_panel_layout.scad. Not a fabrication source.</div>
+
+  <div class="ui-panel">
+    <h3>View</h3>
+    <div class="btn-group">
+      <button class="btn btn-full" id="btn-base" onclick="setViewMode('base')">🧱 Base Cover Only</button>
+      <button class="btn btn-full" id="btn-walls" onclick="setViewMode('walls')">🧊 Side Walls Only</button>
+      <button class="btn btn-full active" id="btn-complete" onclick="setViewMode('complete')">📦 Complete Assembly</button>
+    </div>
+    <h3>Camera</h3>
+    <div class="btn-group">
+      <button class="btn" onclick="setCameraView('iso')">🧊 Isometric</button>
+      <button class="btn" onclick="setCameraView('top')">📐 Top</button>
+      <button class="btn" onclick="setCameraView('front')">👁️ Front</button>
+      <button class="btn" onclick="setCameraView('side')">↔️ Side</button>
+      <button class="btn btn-full" id="btn-rotate" onclick="toggleRotation()">🔄 Pause Rotation</button>
+    </div>
+  </div>
+
+  <div class="info-footer" id="info-footer"></div>
+</div>
+
+<script>
+let scene, camera, renderer, controls;
+let isAutoRotating = true;
+let currentGroup = null;
+let baseGroup = null, wallsGroup = null, panelGroup = null;
+let currentMode = 'complete';
+
+// ---- Shared numbers, copied from top_panel_layout.scad / the three parts ----
+// Three separate printed parts, stacked bottom to top:
+//   1. case_base.scad  -- flat cover, 2.8 mm
+//   2. case_walls.scad -- open frame, 45.2 mm
+//   3. top_panel.stl   -- flat panel with all the cutouts, 2.8 mm (already printed)
+// 2.8 + 45.2 + 2.8 = 50.8 mm (2 in) total, ground to top panel.
+const PANEL_W = 210, PANEL_H = 140, CORNER_R = 8;
+
+const PANEL_THICKNESS = 2.8;   // the already-printed top panel
+const WALL_HEIGHT = 45.2, WALL_THICKNESS = 2.8;
+const BASE_THICKNESS = 2.8;
+const BOSS_OD = 7.0, BOSS_PILOT_DIA = 2.6, BOSS_HEIGHT = 10.0; // engagement length, not full height
+// Wire pass-through: through the wall frame's back wall, offset to one side
+// (not centred, not through the floor), at a height clear of both rims.
+const WIRE_HOLE_DIA = 8.0, WIRE_HOLE_X = 40, WIRE_HOLE_Z = 20;
+const SHELL_COLOR = 0xe5e1d8; // one colour for base + walls + panel so the assembly reads as a single enclosure
+
+const MOTOR_HOLE_DIA = 10.4;
+const MOTOR_POS = [[37, 114], [37, 84], [37, 54], [67, 114], [67, 84], [67, 54]];
+
+const BTN_HOLE = 12.4, BTN_HOLE_R = 0.5;
+const BTN_POS = [[143, 114], [143, 84], [143, 54], [173, 114], [173, 84], [173, 54], [158, 24]];
+
+const GRILL_HOLE_DIA = 2.5;
+const GRILL_POS = [[105, 28], [105, 33.5], [109.763, 30.75], [109.763, 25.25], [105, 22.5], [100.237, 25.25], [100.237, 30.75], [105, 39], [110.5, 37.5263], [114.526, 33.5], [116, 28], [114.526, 22.5], [110.5, 18.4737], [105, 17], [99.5, 18.4737], [95.4737, 22.5], [94, 28], [95.4737, 33.5], [99.5, 37.5263], [105, 44], [110.472, 43.0351], [115.285, 40.2567], [118.856, 36], [120.757, 30.7784], [120.757, 25.2216], [118.856, 20], [115.285, 15.7433], [110.472, 12.9649], [105, 12], [99.5277, 12.9649], [94.7154, 15.7433], [91.1436, 20], [89.2431, 25.2216], [89.2431, 30.7784], [91.1436, 36], [94.7154, 40.2567], [99.5277, 43.0351]];
+
+const SCREW_DIA = 3.2;
+const SCREW_POS = [[8, 132], [202, 132], [8, 8], [202, 8]];
+
+// plan (x, y_plan) -> world (x, z), centred on the console
+function px(x) { return x - PANEL_W / 2; }
+function pz(y) { return PANEL_H / 2 - y; }
+
+// ---- Shape helpers (all in plan coordinates: 0..PANEL_W, 0..PANEL_H, matching the .scad files) ----
+function roundedRectPoints(target, x0, y0, w, d, r) {
+  target.moveTo(x0 + r, y0);
+  target.lineTo(x0 + w - r, y0);
+  target.absarc(x0 + w - r, y0 + r, r, -Math.PI / 2, 0, false);
+  target.lineTo(x0 + w, y0 + d - r);
+  target.absarc(x0 + w - r, y0 + d - r, r, 0, Math.PI / 2, false);
+  target.lineTo(x0 + r, y0 + d);
+  target.absarc(x0 + r, y0 + d - r, r, Math.PI / 2, Math.PI, false);
+  target.lineTo(x0, y0 + r);
+  target.absarc(x0 + r, y0 + r, r, Math.PI, 1.5 * Math.PI, false);
+}
+function roundedRectShape(x0, y0, w, d, r) {
+  const s = new THREE.Shape();
+  roundedRectPoints(s, x0, y0, w, d, r);
+  return s;
+}
+function roundedRectPath(x0, y0, w, d, r) {
+  const p = new THREE.Path();
+  roundedRectPoints(p, x0, y0, w, d, r);
+  return p;
+}
+function circlePath(cx, cy, r) {
+  const p = new THREE.Path();
+  p.absarc(cx, cy, r, 0, Math.PI * 2, false);
+  return p;
+}
+function roundedSquarePath(cx, cy, size, r) {
+  return roundedRectPath(cx - size / 2, cy - size / 2, size, size, r);
+}
+
+// A 90-degree ring wedge (outer arc, straight edge in, inner arc back,
+// straight edge out) -- one corner of the wall frame. No hole, so there's
+// nothing for earcut to get wrong.
+function ringSectorShape(cx, cy, rOuter, rInner, a0, a1) {
+  const s = new THREE.Shape();
+  s.absarc(cx, cy, rOuter, a0, a1, false);
+  s.lineTo(cx + rInner * Math.cos(a1), cy + rInner * Math.sin(a1));
+  s.absarc(cx, cy, rInner, a1, a0, true);
+  s.lineTo(cx + rOuter * Math.cos(a0), cy + rOuter * Math.sin(a0));
+  return s;
+}
+function rectShape(x0, y0, rw, rh) {
+  const s = new THREE.Shape();
+  s.moveTo(x0, y0);
+  s.lineTo(x0 + rw, y0);
+  s.lineTo(x0 + rw, y0 + rh);
+  s.lineTo(x0, y0 + rh);
+  s.lineTo(x0, y0);
+  return s;
+}
+// The wall frame's cross-section, decomposed into 4 corner wedges + 4
+// straight strips, instead of one "outer shape minus a hole". A hole that
+// has to touch or breach the outer contour (to open the wire hole all the
+// way through) isn't valid input for earcut's nested-hole triangulation --
+// that produced the broken/missing hole in earlier versions of this. Plain
+// non-holed pieces sidestep the problem entirely: the back strip is simply
+// split around the notch, leaving a real gap with no geometry in it at all.
+function frameSliceShapes(w, d, r, wallT, notchX0, notchX1) {
+  const innerR = Math.max(r - wallT, 0.4);
+  const shapes = [
+    ringSectorShape(r, r, r, innerR, Math.PI, 1.5 * Math.PI),             // bottom-left
+    ringSectorShape(w - r, r, r, innerR, -Math.PI / 2, 0),                // bottom-right
+    ringSectorShape(w - r, d - r, r, innerR, 0, Math.PI / 2),             // top-right
+    ringSectorShape(r, d - r, r, innerR, Math.PI / 2, Math.PI),           // top-left
+    rectShape(r, 0, w - 2 * r, wallT),                                    // front strip
+    rectShape(0, r, wallT, d - 2 * r),                                    // left strip
+    rectShape(w - wallT, r, wallT, d - 2 * r),                            // right strip
+  ];
+  const hasNotch = notchX1 > notchX0;
+  if (!hasNotch) {
+    shapes.push(rectShape(r, d - wallT, w - 2 * r, wallT));               // back strip, whole
+  } else {
+    if (notchX0 > r) shapes.push(rectShape(r, d - wallT, notchX0 - r, wallT));
+    if (notchX1 < w - r) shapes.push(rectShape(notchX1, d - wallT, (w - r) - notchX1, wallT));
+  }
+  return shapes;
+}
+// The actual shape of case_walls.scad, with a real round through-hole cut
+// in the back wall, offset to one side. A true lateral hole can't be
+// punched by a single vertical extrusion (its shape holes only go straight
+// up), so this stacks many thin slices, each notched to that height's
+// chord width across the hole -- the notches together read as a genuine
+// circular opening.
+function buildWallGroupWithHole(w, d, r, wallT, height, holeX, holeZ, holeDia, material) {
+  const group = new THREE.Group();
+  const holeR = holeDia / 2;
+  const zLow = Math.max(holeZ - holeR, 0), zHigh = Math.min(holeZ + holeR, height);
+
+  function addSlab(z0, z1, notchX0, notchX1) {
+    if (z1 - z0 <= 0) return;
+    const shapes = frameSliceShapes(w, d, r, wallT, notchX0, notchX1);
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth: z1 - z0, bevelEnabled: false, curveSegments: 16 });
+    group.add(slabMesh(geo, material, z0));
+  }
+
+  addSlab(0, zLow, 0, 0);
+  const SLICES = 16;
+  const sliceH = (zHigh - zLow) / SLICES;
+  for (let i = 0; i < SLICES; i++) {
+    const s0 = zLow + i * sliceH, s1 = s0 + sliceH;
+    const dz = (s0 + s1) / 2 - holeZ;
+    const halfChord = Math.sqrt(Math.max(holeR * holeR - dz * dz, 0));
+    addSlab(s0, s1, holeX - halfChord, holeX + halfChord);
+  }
+  addSlab(zHigh, height, 0, 0);
+
+  return group;
+}
+// A solid rounded-rect slab (floor).
+function buildSlabGeometry(w, d, r, thickness) {
+  const shape = roundedRectShape(0, 0, w, d, r);
+  return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: 24 });
+}
+// The top panel (already printed): a rounded-rect slab punched with every real cutout.
+function buildPanelGeometry(w, d, r, thickness) {
+  const shape = roundedRectShape(0, 0, w, d, r);
+  MOTOR_POS.forEach(([x, y]) => shape.holes.push(circlePath(x, y, MOTOR_HOLE_DIA / 2)));
+  BTN_POS.forEach(([x, y]) => shape.holes.push(roundedSquarePath(x, y, BTN_HOLE, BTN_HOLE_R)));
+  GRILL_POS.forEach(([x, y]) => shape.holes.push(circlePath(x, y, GRILL_HOLE_DIA / 2)));
+  SCREW_POS.forEach(([x, y]) => shape.holes.push(circlePath(x, y, SCREW_DIA / 2)));
+  return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: 16 });
+}
+// A screw boss: solid disc with a pilot hole through it.
+function buildBossGeometry(od, pilotDia, height) {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, od / 2, 0, Math.PI * 2, false);
+  shape.holes.push(circlePath(0, 0, pilotDia / 2));
+  return new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 20 });
+}
+
+// Turn an extruded (plan-XY, Z=up-after-rotation) geometry into a correctly placed mesh.
+function slabMesh(geometry, material, yOffset) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(-PANEL_W / 2, yOffset, PANEL_H / 2);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function generatePanelTexture() {
+  const canvas = document.createElement('canvas');
+  const scale = 8; // px per mm
+  canvas.width = PANEL_W * scale;
+  canvas.height = PANEL_H * scale;
+  const ctx = canvas.getContext('2d');
+  const X = x => x * scale, Y = y => (PANEL_H - y) * scale; // flip so plan "up" reads as canvas "up"
+
+  ctx.fillStyle = '#eceae3';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = '#9ca3af';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+
+  ctx.fillStyle = '#1e293b';
+  ctx.font = `bold ${2.6 * scale}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  MOTOR_POS.forEach(([x, y], i) => {
+    ctx.beginPath();
+    ctx.arc(X(x), Y(y), (MOTOR_HOLE_DIA / 2 + 1.5) * scale, 0, Math.PI * 2);
+    ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillText(String(i + 1), X(x), Y(y) - (MOTOR_HOLE_DIA / 2 + 6) * scale);
+  });
+  BTN_POS.forEach(([x, y], i) => {
+    const label = i < 6 ? String(i + 1) : 'SUB';
+    ctx.fillText(label, X(x), Y(y) - (BTN_HOLE / 2 + 6) * scale);
+  });
+  ctx.fillStyle = '#334155';
+  ctx.font = `600 ${1.6 * scale}px system-ui, sans-serif`;
+  ctx.fillText('MOTORS', X(52), Y(130));
+  ctx.fillText('BUTTONS', X(158), Y(130));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 16;
+  return texture;
+}
+
+function buildBaseGroup() {
+  const group = new THREE.Group();
+  const coverMat = new THREE.MeshStandardMaterial({ color: SHELL_COLOR, roughness: 0.5 });
+  const bossMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.45, metalness: 0.1 });
+
+  // A flat cover, not a deep tray: 2.8 mm, so lid (48 mm) + cover (2.8 mm) = 50.8 mm (2 in) total.
+  group.add(slabMesh(buildSlabGeometry(PANEL_W, PANEL_H, CORNER_R, BASE_THICKNESS), coverMat, 0));
+
+  // Screw bosses rise from the cover up into the lid's hollow interior --
+  // they only need enough length to grip an M3 screw, not the full height.
+  SCREW_POS.forEach(([x, y]) => {
+    const boss = new THREE.Mesh(buildBossGeometry(BOSS_OD, BOSS_PILOT_DIA, BOSS_HEIGHT), bossMat);
+    boss.rotation.x = -Math.PI / 2;
+    boss.position.set(px(x), BASE_THICKNESS, pz(y));
+    boss.castShadow = true;
+    group.add(boss);
+  });
+
+  return group;
+}
+
+// The middle part -- case_walls.scad. Open top and bottom, no panel cutouts:
+// the panel already has those. This is the actual part left to print.
+function buildWallsGroup(yOffset) {
+  const bodyMat = new THREE.MeshStandardMaterial({ color: SHELL_COLOR, roughness: 0.5 });
+
+  // A real cut through the back wall (see buildWallGroupWithHole), not a
+  // painted-on disc -- you can see straight through it.
+  const group = buildWallGroupWithHole(
+    PANEL_W, PANEL_H, CORNER_R, WALL_THICKNESS, WALL_HEIGHT,
+    WIRE_HOLE_X, WIRE_HOLE_Z, WIRE_HOLE_DIA, bodyMat
+  );
+  group.position.y = yOffset;
+  return group;
+}
+
+// The top panel -- ALREADY PRINTED (top_panel.stl). Shown only in the
+// complete-assembly view, for reference, so you can see how everything fits.
+function buildTopPanelGroup(yOffset) {
+  const group = new THREE.Group();
+  const panelMat = new THREE.MeshStandardMaterial({ map: generatePanelTexture(), roughness: 0.4 });
+
+  group.add(slabMesh(buildPanelGeometry(PANEL_W, PANEL_H, CORNER_R, PANEL_THICKNESS), panelMat, yOffset));
+
+  const panelTopY = yOffset + PANEL_THICKNESS;
+
+  // Motor faces, flush with the panel top.
+  const motorMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6, metalness: 0.3 });
+  MOTOR_POS.forEach(([x, y]) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(MOTOR_HOLE_DIA / 2 - 0.3, MOTOR_HOLE_DIA / 2 - 0.3, 1.2, 32), motorMat);
+    m.position.set(px(x), panelTopY + 0.6, pz(y));
+    m.castShadow = true;
+    group.add(m);
+  });
+
+  // Button caps, proud of the panel: white for dots 1-3, red for dots 4-6, yellow for submit.
+  BTN_POS.forEach(([x, y], i) => {
+    const color = i < 3 ? 0xffffff : (i < 6 ? 0xdc2626 : 0xeab308);
+    const bGroup = new THREE.Group();
+    const bezel = new THREE.Mesh(
+      new THREE.CylinderGeometry(BTN_HOLE / 2 + 1, BTN_HOLE / 2 + 1.5, 3, 32),
+      new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6, roughness: 0.3 })
+    );
+    bezel.position.y = 1.5;
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(BTN_HOLE / 2 - 1, BTN_HOLE / 2 - 0.7, 5, 32),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.25 })
+    );
+    cap.position.y = 3.8;
+    bGroup.add(bezel, cap);
+    bGroup.position.set(px(x), panelTopY, pz(y));
+    bGroup.castShadow = true;
+    group.add(bGroup);
+  });
+
+  return group;
+}
+
+function init() {
+  const container = document.getElementById('canvas-container');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111827);
+
+  camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 1, 2000);
+  camera.position.set(0, 260, 260);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI / 2 - 0.01;
+  controls.target.set(0, 20, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const mainLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  mainLight.position.set(80, 260, 120);
+  mainLight.castShadow = true;
+  mainLight.shadow.mapSize.set(2048, 2048);
+  mainLight.shadow.bias = -0.0005;
+  scene.add(mainLight);
+  const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.4);
+  fillLight.position.set(-100, 160, -80);
+  scene.add(fillLight);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(1200, 1200),
+    new THREE.ShadowMaterial({ opacity: 0.35 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  baseGroup = buildBaseGroup();
+  wallsGroup = buildWallsGroup(BASE_THICKNESS);
+  panelGroup = buildTopPanelGroup(BASE_THICKNESS + WALL_HEIGHT);
+
+  setViewMode('complete');
+  window.addEventListener('resize', onWindowResize);
+  animate();
+}
+
+function setViewMode(mode) {
+  currentMode = mode;
+  if (currentGroup) scene.remove(currentGroup);
+  currentGroup = new THREE.Group();
+  if (mode === 'base') currentGroup.add(baseGroup);
+  else if (mode === 'walls') currentGroup.add(wallsGroup);
+  else { currentGroup.add(baseGroup); currentGroup.add(wallsGroup); currentGroup.add(panelGroup); }
+  scene.add(currentGroup);
+
+  document.getElementById('btn-base').classList.toggle('active', mode === 'base');
+  document.getElementById('btn-walls').classList.toggle('active', mode === 'walls');
+  document.getElementById('btn-complete').classList.toggle('active', mode === 'complete');
+
+  const badge = document.getElementById('dims-badge');
+  const footer = document.getElementById('info-footer');
+  if (mode === 'base') {
+    badge.textContent = 'Base cover · 210 × 140 × 2.8 mm — PRINT THIS';
+    footer.innerHTML =
+      '📏 <b>Base cover:</b> 210 × 140 mm footprint, 8 mm corner radius, 2.8 mm thick flat cover (not a deep tray).<br>' +
+      '🔩 <b>4 screw bosses</b>, Ø7 mm × 10 mm tall, under the top panel\'s SCREW_POS.';
+  } else if (mode === 'walls') {
+    badge.textContent = 'Side walls · 210 × 140 × 45.2 mm — PRINT THIS';
+    footer.innerHTML =
+      '📏 <b>Side walls:</b> 210 × 140 mm footprint, 8 mm corner radius, 45.2 mm tall, open top and bottom.<br>' +
+      '🔌 <b>Wire hole:</b> Ø8 mm, offset to one side (x = 40), not centred, not through the floor.<br>' +
+      'No motor/button/speaker cutouts here — those are already on the printed top panel.';
+  } else {
+    badge.textContent = 'Complete · 210 × 140 × 50.8 mm (reference)';
+    footer.innerHTML =
+      '📏 <b>Assembled height:</b> 2.8 mm base + 45.2 mm walls + 2.8 mm panel = 50.8 mm (2 in) total.<br>' +
+      '📐 <b>Footprint:</b> 210 × 140 mm, 8 mm corner radius on all three parts — edges line up exactly.<br>' +
+      '🔩 4 screws drop through the panel, through the walls\' open interior, into the base\'s bosses.<br>' +
+      '🖨️ The top panel here is shown for reference — it\'s already printed. Print the base cover and the side walls.';
+  }
+}
+
+function setCameraView(view) {
+  isAutoRotating = false;
+  document.getElementById('btn-rotate').innerText = '🔄 Resume Rotation';
+  if (view === 'top') camera.position.set(0, 340, 0.01);
+  else if (view === 'iso') camera.position.set(180, 220, 220);
+  else if (view === 'front') camera.position.set(0, 70, 320);
+  else if (view === 'side') camera.position.set(320, 70, 0);
+  controls.target.set(0, 20, 0);
+}
+
+function toggleRotation() {
+  isAutoRotating = !isAutoRotating;
+  document.getElementById('btn-rotate').innerText = isAutoRotating ? '🔄 Pause Rotation' : '🔄 Resume Rotation';
+}
+
+function onWindowResize() {
+  const container = document.getElementById('canvas-container');
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (isAutoRotating && currentGroup) currentGroup.rotation.y += 0.005;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.onload = init;
+</script>
+</body>
+</html>

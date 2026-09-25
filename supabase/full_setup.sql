@@ -155,6 +155,27 @@ create policy anon_rw_test_sessions on test_sessions
 
 
 -- ---------------------------------------------------------------------------
+-- MIGRATION: per-student personalization (t12_ml_complete)
+--
+-- remote_commands needs to carry WHICH student a command is for, so the
+-- ESP32 can log attempts under the real student instead of a hardcoded
+-- placeholder, and can reload that student's own history before scoring.
+-- student_weaknesses is extended from a wrong/correct tally into the full
+-- per-(student, character) state the model consumes (mastery, streaks,
+-- previous confidence) so the ESP32 can restore it with one query whenever
+-- the active student changes, instead of replaying the entire attempts
+-- history on every switch.
+-- ---------------------------------------------------------------------------
+alter table remote_commands add column if not exists student_id text;
+
+alter table student_weaknesses add column if not exists mastery double precision not null default 0;
+alter table student_weaknesses add column if not exists current_streak integer not null default 0;
+alter table student_weaknesses add column if not exists wrong_streak integer not null default 0;
+alter table student_weaknesses add column if not exists prev_confidence smallint not null default 0;
+alter table student_weaknesses add column if not exists last_tested timestamptz not null default now();
+
+
+-- ---------------------------------------------------------------------------
 -- VIEWS  (monitoring dashboards — check during data collection)
 -- ---------------------------------------------------------------------------
 create or replace view class_balance as
