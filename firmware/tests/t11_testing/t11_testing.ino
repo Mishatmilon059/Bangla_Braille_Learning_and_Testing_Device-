@@ -390,6 +390,12 @@ static void run_test_item(int letter_id) {
                 g_cur_test_index + 1, g_cur_test_total, letter_id, track, expected);
   Serial.printf("==============================\n");
 
+  if (letter_id == 6 || letter_id == 46) {
+    Serial.println("[test] Audio: 'বিশেষ বর্ণ' (Track 64)");
+    play_and_wait(64, 2500);
+    delay(200);
+  }
+
   play_and_wait(track, 7000);
   uint32_t prompt_end = millis();
 

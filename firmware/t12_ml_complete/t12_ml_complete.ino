@@ -50,6 +50,7 @@
 #define TRACK_TEST_START   61
 #define TRACK_TEST_END     62
 #define TRACK_THANK_YOU    63
+#define TRACK_SPECIAL_CHAR 64
 #define TRACK_NUMBER_BASE  70
 
 #define DOT_ON_MS     500
@@ -613,12 +614,15 @@ static void learning_round(int letter_id) {
   Serial.printf("\n==============================\n");
 
   if (two_stage) {
-    Serial.printf("[learn] Letter #%d (TWO-STAGE) track=%d  s1=0x%02X s2=0x%02X\n",
+    Serial.printf("[learn] Letter #%d (TWO-STAGE SPECIAL) track=%d  s1=0x%02X s2=0x%02X\n",
                   letter_id, track, s1, s2);
     Serial.printf("==============================\n");
     int retry_count = 0;
 
     for (;;) {
+      Serial.println("[learn] Audio: 'বিশেষ বর্ণ' (Track 64)");
+      play_and_wait(TRACK_SPECIAL_CHAR, 2500);
+      delay(200);
       play_and_wait(track, 7000);
       motors_show_sequential(s1, DOT_ON_MS, DOT_GAP_MS);
       delay(STAGE_GAP_MS);
@@ -747,34 +751,59 @@ static void test_round(int letter_id, int test_index, int test_total) {
     delay(400);
   }
 
+  uint8_t s1, s2;
+  bool two_stage = get_two_stage(letter_id, s1, s2);
   uint8_t expected = BRAILLE_PATTERN[letter_id];
   int track = letter_id + 1;
 
   Serial.printf("\n=========================================\n");
-  Serial.printf("[test] Item %d/%d -- Letter #%d track=%d expected=0x%02X\n",
-                test_index + 1, test_total, letter_id, track, expected);
+  Serial.printf("[test] Item %d/%d -- Letter #%d track=%d expected=0x%02X%s\n",
+                test_index + 1, test_total, letter_id, track, expected,
+                two_stage ? " (SPECIAL CHAR - TWO STAGE)" : "");
   Serial.println("[test] (Vibration motors DISABLED)");
   Serial.printf("=========================================\n");
+
+  // If this is a special letter (ঋ or ৎ), announce "বিশেষ বর্ণ" first!
+  if (two_stage) {
+    Serial.println("[test] Audio: 'বিশেষ বর্ণ' (Track 64)");
+    play_and_wait(TRACK_SPECIAL_CHAR, 2500);
+    delay(200);
+  }
 
   // Play audio prompt for the letter
   play_and_wait(track, 7000);
 
-  // Single attempt from student (no vibration, no hints)
+  bool correct = false;
   uint32_t rt_ms = 0;
-  uint8_t entered = wait_for_submit(&rt_ms);
-  bool correct = (entered == expected);
+
+  if (two_stage) {
+    // Stage 1 input
+    uint32_t rt1 = 0;
+    uint8_t in1 = wait_for_submit(&rt1);
+    bool ok1 = (in1 == s1);
+
+    // Stage 2 input
+    uint32_t rt2 = 0;
+    uint8_t in2 = wait_for_submit(&rt2);
+    bool ok2 = (in2 == s2);
+
+    correct = (ok1 && ok2);
+    rt_ms = (rt1 + rt2) / 2;
+    report_test_attempt(letter_id, s2, in2, rt_ms, correct);
+  } else {
+    // Single attempt from student (no vibration, no hints)
+    uint8_t entered = wait_for_submit(&rt_ms);
+    correct = (entered == expected);
+    report_test_attempt(letter_id, expected, entered, rt_ms, correct);
+  }
 
   if (correct) {
     g_test_correct_count++;
     Serial.printf("[test] CORRECT! (rt=%ums)\n", (unsigned)rt_ms);
   } else {
     g_test_wrong_count++;
-    Serial.printf("[test] WRONG! entered=0x%02X expected=0x%02X (rt=%ums)\n",
-                  entered, expected, (unsigned)rt_ms);
+    Serial.printf("[test] WRONG! (rt=%ums)\n", (unsigned)rt_ms);
   }
-
-  // Report attempt to Supabase
-  report_test_attempt(letter_id, expected, entered, rt_ms, correct);
 
   // If last item of the test: announce summary
   if (test_index + 1 >= test_total) {

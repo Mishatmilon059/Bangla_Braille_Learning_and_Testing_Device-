@@ -386,7 +386,10 @@ static void learning_round(int letter_id) {
     int retry_count = 0;
 
     for (;;) {
-      // 1. Audio
+      // 1. Audio: "বিশেষ বর্ণ", then letter pronunciation
+      Serial.println("[learn] Audio: 'বিশেষ বর্ণ' (Track 64)");
+      play_and_wait(64, 2500);
+      delay(200);
       play_and_wait(track, 7000);
 
       // 2. Show both stages before any input -- each dot buzzes one at a

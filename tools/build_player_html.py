@@ -14,6 +14,7 @@ tracks = [
     (51, "সঠিক", "0051.mp3", "cue"),
     (52, "ভুল", "0052.mp3", "cue"),
     (63, "ধন্যবাদ", "0063.mp3", "cue"),
+    (64, "বিশেষ বর্ণ", "0064.mp3", "cue"),
     (70, "০ (শূন্য)", "0070.mp3", "num"),
     (71, "১ (এক)", "0071.mp3", "num"),
     (72, "২ (দুই)", "0072.mp3", "num"),
@@ -136,7 +137,15 @@ html_content = f"""<!DOCTYPE html>
           <span class="text-base group-hover:scale-110 transition">✕</span>
         </button>
 
-        <button onclick="playTrack(63)" id="btn-track-63" class="track-btn p-3 bg-[var(--background)] border border-[var(--border)] hover:border-emerald-500 rounded-xl text-left transition flex items-center justify-between group sm:col-span-2">
+        <button onclick="playTrack(64)" id="btn-track-64" class="track-btn p-3 bg-[var(--background)] border border-[var(--border)] hover:border-amber-500 rounded-xl text-left transition flex items-center justify-between group">
+          <div>
+            <div class="text-xs font-mono text-amber-500">Track 64 (নতুন)</div>
+            <div class="text-sm font-semibold text-amber-600 dark:text-amber-400">বিশেষ বর্ণ</div>
+          </div>
+          <span class="text-base group-hover:scale-110 transition">⭐</span>
+        </button>
+
+        <button onclick="playTrack(63)" id="btn-track-63" class="track-btn p-3 bg-[var(--background)] border border-[var(--border)] hover:border-emerald-500 rounded-xl text-left transition flex items-center justify-between group">
           <div>
             <div class="text-xs font-mono text-[var(--muted-foreground)]">Track 63</div>
             <div class="text-sm font-semibold">ধন্যবাদ</div>
