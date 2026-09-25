@@ -449,6 +449,26 @@ static int poll_supabase() {
 }
 
 // ---------------------------------------------------------------------------
+// Heartbeat -- informs Supabase device_status that this ESP32 is online
+// ---------------------------------------------------------------------------
+#define HEARTBEAT_MS 4000
+static uint32_t g_last_heartbeat = 0;
+
+static void send_heartbeat() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/device_status?on_conflict=device_id";
+  http.begin(https_client(), url);
+  http.setReuse(true);
+  http.addHeader("apikey",        SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.addHeader("Content-Type",  "application/json");
+  http.addHeader("Prefer",        "resolution=merge-duplicates,return=minimal");
+  http.POST("{\"device_id\":\"" + String(DEVICE_ID) + "\"}");
+  http.end();
+}
+
+// ---------------------------------------------------------------------------
 // Audio
 // ---------------------------------------------------------------------------
 
@@ -641,6 +661,7 @@ void setup() {
   WiFi.persistent(false);
   wifi_connect();
   sync_latest_id();
+  send_heartbeat();
 
   // No command has named a student yet -- load the default's own history
   // rather than starting it from zero every boot.
@@ -653,6 +674,11 @@ void setup() {
 }
 
 void loop() {
+  if (millis() - g_last_heartbeat >= HEARTBEAT_MS) {
+    g_last_heartbeat = millis();
+    send_heartbeat();
+  }
+
   if (millis() - g_last_poll >= POLL_MS) {
     g_last_poll = millis();
     int letter_id = poll_supabase();

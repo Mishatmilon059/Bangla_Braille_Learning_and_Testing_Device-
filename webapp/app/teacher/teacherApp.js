@@ -91,28 +91,45 @@ export function startTeacherApp() {
     S.lastAttemptId = null;
     lastActiveTimestamp = 0;
     clearInterval(S.pollTimer);
+    clearInterval(S.heartbeatTimer);
     S.pollTimer = setInterval(pollAttempts, 200);
-    cleanupFns.push(() => clearInterval(S.pollTimer));
-    checkRecentActivity();
+    S.heartbeatTimer = setInterval(checkHeartbeat, 2500);
+    cleanupFns.push(() => {
+      clearInterval(S.pollTimer);
+      clearInterval(S.heartbeatTimer);
+    });
+    checkHeartbeat();
   }
 
-  async function checkRecentActivity() {
-    const recentWindow = new Date(Date.now() - 45 * 1000).toISOString();
-    const rows = await sbGet('attempts', {
-      select: 'id,created_at,user_id',
-      device_id: `eq.${S.deviceId}`,
-      created_at: `gt.${recentWindow}`,
-      limit: '1',
-    });
-    if (rows.length) {
-      lastActiveTimestamp = Date.now();
-      setEspStatus('connected');
-    } else {
-      setEspStatus('searching');
+  async function checkHeartbeat() {
+    try {
+      const rows = await sbGet('device_status', {
+        select: 'device_id,last_seen',
+        device_id: `eq.${S.deviceId}`,
+        limit: '1',
+      });
+      if (rows && rows.length > 0 && rows[0].last_seen) {
+        const diffMs = Date.now() - new Date(rows[0].last_seen).getTime();
+        if (diffMs >= 0 && diffMs < 10000) {
+          setEspStatus('connected');
+          return;
+        }
+      }
+      if (lastActiveTimestamp > 0 && Date.now() - lastActiveTimestamp < 20000) {
+        setEspStatus('connected');
+        return;
+      }
+      setEspStatus('disconnected');
+    } catch {
+      setEspStatus('disconnected');
     }
   }
 
-  function stopPoll() { clearInterval(S.pollTimer); setEspStatus('idle'); }
+  function stopPoll() {
+    clearInterval(S.pollTimer);
+    clearInterval(S.heartbeatTimer);
+    setEspStatus('idle');
+  }
 
   async function pollAttempts() {
     const rows = await sbGet('attempts', {
@@ -127,8 +144,6 @@ export function startTeacherApp() {
       lastActiveTimestamp = Date.now();
       setEspStatus('connected');
       handleAttempt(rows[0]);
-    } else if (lastActiveTimestamp > 0 && Date.now() - lastActiveTimestamp > 60000) {
-      setEspStatus('searching');
     }
   }
 
@@ -193,12 +208,14 @@ export function startTeacherApp() {
   function setEspStatus(state) {
     const badge = el('esp-badge');
     const dot = el('esp-dot');
+    const label = el('esp-label');
+    if (!badge || !dot) return;
     if (state === 'connected') {
       badge.classList.remove('off'); dot.classList.remove('off');
-      el('esp-label').textContent = 'ESP32 সংযুক্ত';
+      if (label) label.textContent = 'ESP32 সংযুক্ত';
     } else {
       badge.classList.add('off'); dot.classList.add('off');
-      el('esp-label').textContent = 'ESP32 নিষ্ক্রিয়';
+      if (label) label.textContent = state === 'searching' ? 'খুঁজছে...' : 'সংযোগ নেই';
     }
   }
 
