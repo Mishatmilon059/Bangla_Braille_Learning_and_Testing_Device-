@@ -1,0 +1,8 @@
+requirements.txt
+firmware/
+dataset/
+enclosure/
+tools/
+docs/
+models/
+web/
