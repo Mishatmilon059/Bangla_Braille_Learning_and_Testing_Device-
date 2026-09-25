@@ -161,7 +161,10 @@ export function startTeacherApp() {
 
   // ─── Student switching ──────────────────────────────────────────────────
   function setStudentId(id) {
-    const clean = (id || '').trim();
+    // Strip quote/backslash chars -- this id is later concatenated raw into
+    // JSON bodies by the ESP32 firmware (report_attempt/save_student_weakness),
+    // so a stray '"' here would corrupt that JSON and silently drop the row.
+    const clean = (id || '').trim().replace(/["\\]/g, '');
     if (!clean || clean === S.studentId) return;
     S.studentId = clean;
     try { window.localStorage.setItem('teacher_student_id', clean); } catch {}

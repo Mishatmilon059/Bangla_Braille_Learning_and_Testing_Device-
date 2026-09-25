@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadRoster, loadStudentProfile, masteryTier } from "./studentsApp";
+import { LETTERS } from "@/lib/brailleMap";
 
 const CONF_LABEL = { confident: "কনফিডেন্ট", hesitant: "দ্বিধাগ্রস্ত", guessing: "অনুমাননির্ভর" };
 const CONF_COLOR = { confident: "var(--green)", hesitant: "var(--amber)", guessing: "var(--red)" };
@@ -201,6 +202,59 @@ export default function StudentsPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Test Sessions history */}
+                    {profile.testSessions && profile.testSessions.length > 0 && (
+                      <div style={{ marginTop: 16 }}>
+                        <div className="text-xs" style={{ color: "var(--text2)", margin: "14px 0 6px", fontWeight: 700 }}>
+                          📋 পরীক্ষার ফলাফল ও ইতিহাস ({profile.testSessions.length} টি পরীক্ষা)
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {profile.testSessions.map((t: any) => {
+                            const pct = t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0;
+                            const lettersStr = Array.isArray(t.letter_ids)
+                              ? t.letter_ids.map((id: number) => LETTERS[id]?.char || `#${id}`).join(", ")
+                              : "";
+                            return (
+                              <div
+                                key={t.id}
+                                style={{
+                                  background: "var(--surface)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: 8,
+                                  padding: "10px 12px",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                    পরীক্ষা #{t.id} —{" "}
+                                    <span style={{ color: pct >= 80 ? "var(--green-dark)" : pct >= 50 ? "var(--amber)" : "var(--red)" }}>
+                                      {pct}%
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 2 }}>
+                                    সঠিক: <b style={{ color: "var(--green-dark)" }}>{t.correct}</b> | ভুল: <b style={{ color: "var(--red)" }}>{t.wrong}</b> | মোট: {t.total}
+                                  </div>
+                                  {lettersStr && (
+                                    <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 2 }}>
+                                      বর্ণসমূহ: <span style={{ color: "var(--text)" }}>{lettersStr}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--text2)", textAlign: "right" }}>
+                                  {new Date(t.created_at).toLocaleDateString()}
+                                  <br />
+                                  {new Date(t.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

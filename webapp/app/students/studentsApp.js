@@ -25,15 +25,28 @@ async function sbGet(table, params = {}) {
   }
 }
 
+async function sbGetAll(table, params = {}, pageSize = 1000) {
+  let allRows = [];
+  let page = 0;
+  while (true) {
+    const pageParams = { ...params, limit: String(pageSize), offset: String(page * pageSize) };
+    const rows = await sbGet(table, pageParams);
+    if (!rows || rows.length === 0) break;
+    allRows = allRows.concat(rows);
+    if (rows.length < pageSize) break;
+    page++;
+    if (page > 30) break; // safety guard
+  }
+  return allRows;
+}
+
 /** One row per distinct student found in `attempts`, with aggregate stats
- *  computed client-side (no view/RPC needed -- the row counts here are small,
- *  a handful of testers, not a production-scale user base). */
+ *  computed client-side. Paginates through all attempts so no students or
+ *  new test runs get truncated by PostgREST's 1000-row limit. */
 export async function loadRoster() {
-  const rows = await sbGet("attempts", {
+  const rows = await sbGetAll("attempts", {
     select: "user_id,is_correct,created_at",
-    is_synthetic: "eq.false",
-    order: "created_at.asc",
-    limit: "20000",
+    order: "created_at.desc",
   });
   const byStudent = new Map();
   for (const r of rows) {
@@ -44,32 +57,35 @@ export async function loadRoster() {
     const s = byStudent.get(id);
     s.total += 1;
     if (r.is_correct) s.correct += 1;
-    s.lastSeen = r.created_at;
+    if (!s.lastSeen || new Date(r.created_at) > new Date(s.lastSeen)) {
+      s.lastSeen = r.created_at;
+    }
   }
-  // Best performer first -- this is a leaderboard-style overview, not an
-  // activity feed, so rank by accuracy rather than recency.
+  // Best performer first -- this is a leaderboard-style overview (rank #1 gets
+  // the gold badge, "top 5" means most accurate), not an activity feed.
   return Array.from(byStudent.values())
     .map((s) => ({ ...s, accuracy: s.total > 0 ? s.correct / s.total : 0 }))
     .sort((a, b) => b.accuracy - a.accuracy);
 }
 
-/** Full profile for one student: per-letter mastery grid (what the ESP32's
- *  fetch_student_state() would load) PLUS the analytics a teacher actually
- *  needs to judge how this student is doing -- overall accuracy, the
- *  model's confidence-state read on them (confident / hesitant / guessing),
- *  and a session-by-session accuracy trend so improvement (or regression)
- *  is visible at a glance, not just a flat list of individual attempts. */
+/** Full profile for one student: per-letter mastery grid, analytics,
+ *  historical test sessions from `test_sessions`, and ML decisions. */
 export async function loadStudentProfile(studentId) {
-  const [weak, attempts] = await Promise.all([
+  const [weak, attempts, testSessions] = await Promise.all([
     sbGet("student_weaknesses", {
       student_id: `eq.${studentId}`,
       select: "char_id,correct_count,wrong_count,mastery,current_streak,wrong_streak,last_tested",
     }),
-    sbGet("attempts", {
+    sbGetAll("attempts", {
       user_id: `eq.${studentId}`,
       select: "char_id,is_correct,response_time,press_duration,retry_count,prev_accuracy,prev_mastery,hint_count,current_streak,wrong_streak,teaching_action,confidence_state,session_id,created_at",
       order: "created_at.asc",
-      limit: "5000",
+    }),
+    sbGet("test_sessions", {
+      student_id: `eq.${studentId}`,
+      select: "id,total,correct,wrong,letter_ids,results,created_at",
+      order: "created_at.desc",
+      limit: "50",
     }),
   ]);
 
@@ -156,7 +172,7 @@ export async function loadStudentProfile(studentId) {
     charId: latestAttempt.char_id,
   };
 
-  return { grid, total, correct, wrong, avgResponseMs, confidence, sessions, latest };
+  return { grid, total, correct, wrong, avgResponseMs, confidence, sessions, latest, testSessions };
 }
 
 export function masteryTier(mastery, attempts) {
