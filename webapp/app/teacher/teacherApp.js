@@ -90,6 +90,20 @@ export function startTeacherApp() {
     clearInterval(S.pollTimer);
     S.pollTimer = setInterval(pollAttempts, 200);
     cleanupFns.push(() => clearInterval(S.pollTimer));
+    checkRecentActivity();
+  }
+
+  async function checkRecentActivity() {
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const rows = await sbGet('attempts', {
+      select: 'id,created_at',
+      device_id: `eq.${S.deviceId}`,
+      created_at: `gt.${thirtyMinsAgo}`,
+      limit: '1',
+    });
+    if (rows.length) {
+      setEspStatus('connected');
+    }
   }
 
   function stopPoll() { clearInterval(S.pollTimer); setEspStatus('idle'); }
