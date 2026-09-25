@@ -445,6 +445,11 @@ static int poll_supabase() {
           int end_q = after.indexOf('"', 1);
           if (end_q > 0) {
             String sid = after.substring(1, end_q);
+            // g_student_id is later concatenated raw into JSON bodies
+            // (report_attempt/save_student_weakness) with no escaping, so a
+            // stray '"' or '\' here would corrupt that JSON downstream.
+            sid.replace("\"", "");
+            sid.replace("\\", "");
             sid.toCharArray(g_student_id, sizeof(g_student_id));
           }
         }
