@@ -74,9 +74,12 @@ export function startLearnScreenApp() {
   // actually out there. It now starts as "খুঁজছে..." (searching) and only
   // flips to connected once a genuinely new attempt row (created after this
   // session started) actually arrives -- real evidence the device is alive.
+  let lastActiveTimestamp = 0;
+
   function startPoll() {
     S.sessionStart = new Date().toISOString();
     S.lastAttemptId = null;
+    lastActiveTimestamp = 0;
     clearInterval(S.pollTimer);
     S.pollTimer = setInterval(pollAttempts, 200);
     cleanupFns.push(() => clearInterval(S.pollTimer));
@@ -84,15 +87,18 @@ export function startLearnScreenApp() {
   }
 
   async function checkRecentActivity() {
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const recentWindow = new Date(Date.now() - 45 * 1000).toISOString();
     const rows = await sbGet('attempts', {
       select: 'id,created_at,user_id',
       device_id: `eq.${S.deviceId}`,
-      created_at: `gt.${fourHoursAgo}`,
+      created_at: `gt.${recentWindow}`,
       limit: '1',
     });
     if (rows.length) {
+      lastActiveTimestamp = Date.now();
       setEspStatus('connected');
+    } else {
+      setEspStatus('searching');
     }
   }
 
@@ -108,8 +114,11 @@ export function startLearnScreenApp() {
     });
     if (rows.length && rows[0].id !== S.lastAttemptId) {
       S.lastAttemptId = rows[0].id;
+      lastActiveTimestamp = Date.now();
       setEspStatus('connected');
       handleAttempt(rows[0]);
+    } else if (lastActiveTimestamp > 0 && Date.now() - lastActiveTimestamp > 60000) {
+      setEspStatus('searching');
     }
   }
 
