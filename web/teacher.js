@@ -79,6 +79,7 @@ const S = {
   lastAttemptId: null,
   pollTimer:     null,
   stopRequested: false,
+  isTeaching:    false,
   studentId:  'S01',
   deviceId:   'esp32_01',
   weaknesses: {},
@@ -140,6 +141,10 @@ async function pollAttempts() {
 }
 
 async function sendPlay(letterId, isTest = false, testIndex = null, testTotal = null) {
+  if (!isTest) {
+    S.isTeaching = true;
+    S.stopRequested = false;
+  }
   const body = {
     device_id: S.deviceId,
     letter_id: letterId,
@@ -162,6 +167,8 @@ async function sendStop() {
 // ─── Attempt handler ──────────────────────────────────────────────────────────
 function handleAttempt(row) {
   if (S.screen === 'learn') {
+    if (!S.isTeaching) return; // Drop attempt when teaching stopped!
+
     const letter = S.learnMode === 'seq'
       ? LETTERS[S.seqIdx]
       : (S.rndSelected !== null ? LETTERS[S.rndSelected] : null);
@@ -170,11 +177,6 @@ function handleAttempt(row) {
     renderLearnResult(row, letter);
 
     if (row.is_correct) {
-      if (S.stopRequested) {
-        S.stopRequested = false;
-        showToast('✓ সঠিক উত্তর! পাঠদান শেষ হয়েছে। ধন্যবাদ।', 3500);
-        return;
-      }
       if (S.learnMode === 'seq' && S.autoAdvance) {
         setTimeout(seqNext, 1200);
       }
@@ -393,6 +395,7 @@ function seqRender() {
 }
 
 function seqNext() {
+  if (!S.isTeaching) return;
   if (S.seqIdx < LETTERS.length - 1) {
     S.seqIdx++;
     seqRender();
@@ -637,9 +640,12 @@ export async function init() {
   });
   el('btn-seq-play').addEventListener('click', () => { sendPlay(LETTERS[S.seqIdx].id); });
   el('btn-seq-stop').addEventListener('click', async () => {
-    S.stopRequested = true;
+    S.isTeaching = false;
+    S.stopRequested = false;
     await sendStop();
-    showToast('পাঠদান থামানোর অনুরোধ পাঠানো হয়েছে। বর্তমান বর্ণটি সঠিক হলে শেষ হবে।');
+    el('seq-result')?.classList.add('hidden');
+    el('seq-match-badge')?.classList.add('hidden');
+    showToast('পাঠদান থামানো হয়েছে। আর কোনো এন্ট্রি নেওয়া হবে না।');
   });
   el('btn-seq-auto').addEventListener('click', () => {
     S.autoAdvance = !S.autoAdvance;

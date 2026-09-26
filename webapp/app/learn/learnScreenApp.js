@@ -171,16 +171,35 @@ export function startLearnScreenApp() {
   }
 
   async function stopTeachSession() {
-    S.stopRequested = true;
+    S.isTeaching = false;
+    S.stopRequested = false;
     await sendStop();
-    showToast('পাঠদান থামানোর নির্দেশ পাঠানো হয়েছে। বর্তমান বর্ণটি সঠিক হলে পাঠদান শেষ হবে।', 3500);
+    showToast('পাঠদান থামানো হয়েছে। আর কোনো এন্ট্রি নেওয়া হবে না।', 3000);
 
-    const matchEl = el(S.learnMode === 'seq' ? 'seq-match-badge' : 'rnd-match-badge');
+    const isSeq = S.learnMode === 'seq';
+    const prefix = isSeq ? 'seq' : 'rnd';
+
+    // Hide active result and comparison cards immediately
+    el(prefix + '-result')?.classList.add('hidden');
+    el(prefix + '-dots-cmp')?.classList.add('hidden');
+    el(prefix + '-hint')?.classList.add('hidden');
+
+    const matchEl = el(prefix + '-match-badge');
     if (matchEl) {
-      matchEl.textContent = '⏸️ বর্তমান বর্ণটির সঠিক উত্তর দিলে পাঠদান সমাপ্ত হবে';
+      matchEl.textContent = '✕ পাঠদান বন্ধ রয়েছে';
       matchEl.className = 'badge amber';
       matchEl.classList.remove('hidden');
     }
+
+    // Reset teach button text
+    const teachBtn = el(isSeq ? 'btn-seq-teach' : 'btn-rnd-teach');
+    if (teachBtn) {
+      teachBtn.textContent = isSeq ? '▶ পাঠদান শুরু করুন' : '▶ শেখান';
+    }
+
+    // Web audio cues: Track 62 (পরীক্ষা শেষ) followed by Track 63 (ধন্যবাদ)
+    playWebAudio(62);
+    setTimeout(() => playWebAudio(63), 2000);
   }
 
   // ─── Student switching ──────────────────────────────────────────────────
@@ -200,6 +219,9 @@ export function startLearnScreenApp() {
 
   // ─── Attempt handler ────────────────────────────────────────────────────
   function handleAttempt(row) {
+    // If teaching is stopped, strictly drop any entries
+    if (!S.isTeaching) return;
+
     const letter = S.learnMode === 'seq'
       ? LETTERS[S.seqIdx]
       : (S.rndSelected !== null ? LETTERS[S.rndSelected] : null);
@@ -208,30 +230,6 @@ export function startLearnScreenApp() {
     renderLearnResult(row, letter);
 
     if (row.is_correct) {
-      if (S.stopRequested) {
-        // Teacher requested stop: finish this running word completely
-        S.stopRequested = false;
-        S.isTeaching = false;
-        showToast('✓ সঠিক উত্তর! পাঠদান শেষ হয়েছে। ধন্যবাদ।', 4000);
-
-        const matchEl = el(S.learnMode === 'seq' ? 'seq-match-badge' : 'rnd-match-badge');
-        if (matchEl) {
-          matchEl.textContent = '✓ পাঠদান সমাপ্ত ও ফলাফল সংরক্ষিত';
-          matchEl.className = 'badge green';
-          matchEl.classList.remove('hidden');
-        }
-
-        // Web audio fallback: Track 62 (পরীক্ষা শেষ) followed by Track 63 (ধন্যবাদ)
-        playWebAudio(62);
-        setTimeout(() => playWebAudio(63), 2000);
-
-        const teachBtn = el(S.learnMode === 'seq' ? 'btn-seq-teach' : 'btn-rnd-teach');
-        if (teachBtn) {
-          teachBtn.textContent = S.learnMode === 'seq' ? '▶ পাঠদান শুরু করুন' : '▶ শেখান';
-        }
-        return; // STOP HERE! Do not advance to next word
-      }
-
       if (S.learnMode === 'seq' && S.autoAdvance) {
         showToast('✓ সঠিক উত্তর! পরবর্তী বর্ণে যাওয়া হচ্ছে...', 1800);
         setTimeout(seqNext, 1500);
@@ -386,6 +384,7 @@ export function startLearnScreenApp() {
   }
 
   function seqNext() {
+    if (!S.isTeaching) return;
     if (S.seqIdx < LETTERS.length - 1) {
       S.seqIdx++;
       seqRender();
